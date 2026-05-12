@@ -1,0 +1,187 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>PDF Diff Checker — タコまる 道具</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<link rel="stylesheet" href="colors_and_type.css">
+<link rel="stylesheet" href="pdfDiff.css?v=20260513">
+</head>
+<body data-mode="sbs">
+
+<header class="app-header">
+  <div class="masthead">
+    <div class="mark" aria-hidden="true"></div>
+    <h1>PDF Diff Checker<span class="jp">／ PDF 差分 チェッカー</span></h1>
+    <span class="eye">§ 01 · TOOL</span>
+  </div>
+
+  <div class="file-row" aria-label="ファイル選択">
+    <label class="file-slot" id="slotBefore">
+      <span class="eye">BEFORE · 旧</span>
+      <span class="name empty" id="nameBefore">ファイルを選択 — choose pdf</span>
+      <input type="file" id="fileBefore" accept="application/pdf,image/*">
+    </label>
+    <span class="swap" aria-hidden="true">⇄</span>
+    <label class="file-slot" id="slotAfter">
+      <span class="eye">AFTER · 新</span>
+      <span class="name empty" id="nameAfter">ファイルを選択 — choose pdf</span>
+      <input type="file" id="fileAfter" accept="application/pdf,image/*">
+    </label>
+  </div>
+
+  <div class="header-actions">
+    <button id="btnExport" class="btn">JSON — 出力</button>
+    <button id="btnExportHtml" class="btn fill">レポート — REPORT</button>
+  </div>
+</header>
+
+<!-- 比較範囲指定バー -->
+<div id="compareBar" hidden>
+  <span class="cb-eye">§ RANGE · 比較範囲</span>
+  <div class="cb-section">
+    <span class="cb-label">BEFORE</span>
+    <input type="number" id="beforeStart" min="1" value="1" class="cb-num">
+    <span class="cb-dash">—</span>
+    <input type="number" id="beforeEnd" min="1" value="1" class="cb-num">
+    <span class="cb-total" id="beforeTotal">/ TOTAL —</span>
+  </div>
+  <span class="cb-arrow">⇄</span>
+  <div class="cb-section">
+    <span class="cb-label">AFTER</span>
+    <input type="number" id="afterStart" min="1" value="1" class="cb-num">
+    <span class="cb-dash">—</span>
+    <input type="number" id="afterEnd" min="1" value="1" class="cb-num">
+    <span class="cb-total" id="afterTotal">/ TOTAL —</span>
+  </div>
+  <span class="cb-summary" id="cbSummary">対象 — ページ</span>
+  <span class="spacer"></span>
+  <button id="btnReset" class="btn btn-ghost">リセット</button>
+  <button id="btnCompare" class="btn fill">比較を実行 — COMPARE ▶</button>
+</div>
+
+<div id="layout">
+  <aside>
+    <div class="sidebar-header">
+      <span class="eye">§ INDEX</span>
+      <span id="diffStats">— · NO DATA</span>
+      <span class="title">Differences</span>
+      <span class="jp">— 検出された差分の索引</span>
+    </div>
+    <div id="diffList">
+      <div class="diff-empty">
+        Before / After の 2 つのファイルを選択してください。
+		比較を実行ボタンを押すと比較が開始します。
+      </div>
+    </div>
+  </aside>
+
+  <main>
+    <div id="toolbar">
+      <span class="tool-eye">VIEW</span>
+      <div class="modes" role="tablist">
+        <button data-mode="sbs" class="active">並列 · SBS</button>
+        <button data-mode="overlay">重ね · OVERLAY</button>
+        <button data-mode="diff">差分 · DIFF</button>
+      </div>
+      <div class="opacity-control">
+        <span>After 透過率</span>
+        <input type="range" id="opacity" min="0" max="100" value="50">
+        <span id="opacityValue">50%</span>
+      </div>
+      <div class="zoom-control">
+        <span class="tool-eye">ZOOM</span>
+        <button id="btnZoomOut" class="zoom-btn" title="縮小">−</button>
+        <span id="zoomLabel">FIT</span>
+        <button id="btnZoomIn" class="zoom-btn" title="拡大">＋</button>
+        <button id="btnZoomFit" class="zoom-btn zoom-fit" title="画面に合わせる">FIT</button>
+      </div>
+      <span class="spacer"></span>
+      <span id="renderInfo"></span>
+    </div>
+
+    <div id="stage" class="sbs">
+      <div id="zoomBox"></div>
+      <div id="viewHint">
+        <b>DRAG</b> · 移動 &nbsp; <b>WHEEL</b> · 拡大縮小 &nbsp; <b>DBL-CLICK</b> · リセット
+      </div>
+      <div id="empty">
+        <div class="takomaru-mark" aria-hidden="true"></div>
+        <div class="copy">
+          <span class="eye">§ 01 · TOOL · TAKOMARU ARCHIVE</span>
+          <h2>PDF Diff Checker<span class="jp">家づくりの図面を見くらべる。</span></h2>
+          <p>
+            PDFを2つ  — 旧版と新版 — を読み込むと、タコまるが頁ごとに差分を拾い上げ、
+            一覧に表示します。<br />
+            テキストの変更、図面の線、色の変更を表示します。
+          </p>
+          <div class="how-to">
+            <span class="how-eye">§ USAGE · 使い方</span>
+            <ol class="steps">
+              <li>
+                <span class="step-num">01</span>
+                <div>
+                  <span class="step-en">SELECT FILES — ファイルを選択</span>
+                  <span class="step-jp">ヘッダーの <b>BEFORE</b>（旧）と <b>AFTER</b>（新）ボタンを押して、比較したいPDFを2つ選択してください。</span>
+                </div>
+              </li>
+              <li>
+                <span class="step-num">02</span>
+                <div>
+                  <span class="step-en">SET RANGE — 比較範囲を指定</span>
+                  <span class="step-jp">ファイル読込後に表示される比較範囲バーで、BEFORE・AFTERそれぞれの開始・終了ページを入力します。全ページ比較する場合はそのままでOK。</span>
+                </div>
+              </li>
+              <li>
+                <span class="step-num">03</span>
+                <div>
+                  <span class="step-en">COMPARE ▶ — 比較を実行</span>
+                  <span class="step-jp"><b>比較を実行 — COMPARE ▶</b> ボタンを押すと差分を検出します。結果は左の索引に一覧表示されます。</span>
+                </div>
+              </li>
+            </ol>
+          </div>
+          <div class="samples">
+            <span class="eyebrow">§ SAMPLES · 試しに開く</span>
+            <button class="btn" id="btnSampleTable2">表データのサンプル ▶</button>
+            <button class="btn" id="btnSampleFloor2">間取り図のサンプル ▶</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div id="footerBar">
+      <span class="footer-stamp">TAKOMARU · DIFF READER · 2026</span>
+      <div id="pageNav">
+        <button id="btnPrev">◀ PREV</button>
+        <span id="pageLabel">— / —</span>
+        <button id="btnNext">NEXT ▶</button>
+      </div>
+      <span class="spacer"></span>
+      <span id="status">準備完了 — ready</span>
+    </div>
+  </main>
+</div>
+
+<!-- 差分計算中のオーバーレイ -->
+<div id="loaderOverlay" class="loader-overlay">
+  <div class="loader-frame">
+    <div class="loader-scan" aria-hidden="true">
+      <div class="paper paper-b"></div>
+      <div class="paper paper-a"></div>
+      <div class="scan-bar"></div>
+      <div class="dot d1"></div>
+      <div class="dot d2"></div>
+      <div class="dot d3"></div>
+    </div>
+  </div>
+  <div class="loader-text" id="loaderText">
+    Scanning…<span class="jp">差分を、ゆっくり見ています。</span>
+  </div>
+  <div class="loader-progress" id="loaderProgress">準備中</div>
+</div>
+
+<script src="pdfDiff.js?v=20260513"></script>
+</body>
+</html>

@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 180 240" width="180" height="240" aria-label="Takotsubo (octopus pot)">
+  <path d="M 90 218 C 65 218, 18 190, 18 155 C 18 115, 28 86, 40 76 C 40 56, 54 32, 66 29 Q 90 21, 114 29 C 126 32, 140 56, 140 76 C 152 86, 162 115, 162 155 C 162 190, 115 218, 90 218 Z" fill="#c69e6c" fill-opacity="0.16" stroke="#1a1816" stroke-width="1.6" stroke-linejoin="round"></path>
+  <ellipse cx="90" cy="29" rx="26" ry="9" fill="#c69e6c" fill-opacity="0.12" stroke="#1a1816" stroke-width="1.2"></ellipse>
+  <ellipse cx="90" cy="23" rx="20" ry="6.5" fill="rgba(26,24,22,0.10)" stroke="#1a1816" stroke-width="0.8"></ellipse>
+  <ellipse cx="90" cy="84" rx="48" ry="7" fill="none" stroke="#1a1816" stroke-width="0.5" stroke-opacity="0.28"></ellipse>
+  <ellipse cx="90" cy="112" rx="60" ry="9" fill="none" stroke="#1a1816" stroke-width="0.5" stroke-opacity="0.25"></ellipse>
+  <ellipse cx="90" cy="140" rx="68" ry="10" fill="none" stroke="#1a1816" stroke-width="0.5" stroke-opacity="0.24"></ellipse>
+  <ellipse cx="90" cy="168" rx="62" ry="9" fill="none" stroke="#1a1816" stroke-width="0.5" stroke-opacity="0.21"></ellipse>
+  <ellipse cx="90" cy="192" rx="50" ry="7" fill="none" stroke="#1a1816" stroke-width="0.4" stroke-opacity="0.17"></ellipse>
+  <path d="M 132 79 C 150 104, 155 132, 150 162 C 146 182, 136 200, 122 212" fill="none" stroke="#1a1816" stroke-width="0.8" stroke-opacity="0.18"></path>
+  <path d="M 140 92 C 155 118, 158 148, 152 176" fill="none" stroke="#1a1816" stroke-width="0.5" stroke-opacity="0.13"></path>
+  <ellipse cx="90" cy="226" rx="52" ry="9" fill="#1a1816" fill-opacity="0.06"></ellipse>
+</svg>

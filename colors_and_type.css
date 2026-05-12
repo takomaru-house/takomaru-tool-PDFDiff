@@ -1,0 +1,366 @@
+/* ----------------------------------------------------------------------------
+ * タコまる Design System — Colors + Type
+ *
+ * The single source of truth for tokens. Import this file in any artifact
+ * (HTML, slide deck, UI kit) before writing brand‑coloured CSS.
+ *
+ *   <link rel="stylesheet" href="colors_and_type.css">
+ *
+ * Mirrors the canonical styles.css in the takomaruHP repo, plus a small
+ * semantic layer (h1/h2/p/code/caption etc) and three alternate palettes
+ * exposed via a [data-palette] attribute on the root.
+ * ---------------------------------------------------------------------------- */
+
+@import url('https://fonts.googleapis.com/css2?family=Noto+Serif+JP:wght@300;400;500;600;700&family=Noto+Sans+JP:wght@300;400;500;700&family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400&family=JetBrains+Mono:wght@400;500&display=swap');
+
+/* ── Default palette: wood‑natural (canonical) ─────────────────────────────── */
+:root,
+:root[data-palette="wood-natural"] {
+  --bg:        #faf8f3;
+  --paper:     #f0eadb;
+  --ink:       #1a1816;
+  --ink-soft:  #4a4640;
+  --rule:      #d8cfbe;
+  --wood:      #c69e6c;
+  --wood-deep: #8a6740;
+  --sage:      #5b6b4a;
+  --sage-deep: #3d4a32;
+  --rust:      #b35a3a;
+}
+
+/* ── タコまる調和 — orange × green ──────────────────────────────────────────── */
+:root[data-palette="harmony"] {
+  --bg:        #fff8ec;
+  --paper:     #f5e8d3;
+  --ink:       #2a2620;
+  --ink-soft:  #5a534a;
+  --rule:      #e2d6b6;
+  --wood:      #e07b3b;
+  --wood-deep: #9a4f25;
+  --sage:      #3d5a3d;
+  --sage-deep: #233322;
+  --rust:      #b35a3a;
+}
+
+/* ── Earthy ────────────────────────────────────────────────────────────────── */
+:root[data-palette="earthy"] {
+  --bg:        #f4eee4;
+  --paper:     #ebe2cf;
+  --ink:       #1c1815;
+  --ink-soft:  #4a4439;
+  --rule:      #d4c8b0;
+  --wood:      #8a6740;
+  --wood-deep: #5a4226;
+  --sage:      #7a8a4a;
+  --sage-deep: #4f5a30;
+  --rust:      #a85530;
+}
+
+/* ── Monotone ──────────────────────────────────────────────────────────────── */
+:root[data-palette="monotone"] {
+  --bg:        #ededeb;
+  --paper:     #dedcd8;
+  --ink:       #0e0e0d;
+  --ink-soft:  #4a4a48;
+  --rule:      #c0bebb;
+  --wood:      #7a7a78;
+  --wood-deep: #4a4a48;
+  --sage:      #585856;
+  --sage-deep: #1a1a1a;
+  --rust:      #6a6a68;
+}
+
+/* ── Type families ─────────────────────────────────────────────────────────── */
+:root {
+  --serif:    "Cormorant Garamond", "Noto Serif JP", serif;
+  --jp-serif: "Noto Serif JP", serif;
+  --sans:     "Noto Sans JP", system-ui, sans-serif;
+  --mono:     "JetBrains Mono", ui-monospace, monospace;
+
+  /* ── Display + body sizes (px, line‑height unitless) ──────────────────── */
+  --fs-hero:        120px;   --lh-hero:        0.86;   --tr-hero:    -0.03em;
+  --fs-section:      80px;   --lh-section:     0.90;   --tr-section: -0.01em;
+  --fs-h3:           28px;   --lh-h3:          1.25;
+  --fs-display-md:   44px;   --lh-display-md:  1.05;   /* email link, contact */
+  --fs-quote:        38px;   --lh-quote:       1.00;   /* manifesto */
+  --fs-body-lg:      22px;   --lh-body-lg:     1.45;
+  --fs-body:         17px;   --lh-body:        2.05;   /* magazine breathe */
+  --fs-body-sm:      14px;   --lh-body-sm:     1.85;
+  --fs-meta:         13px;   --lh-meta:        1.95;
+  --fs-mono:         11px;   --lh-mono:        1.40;
+  --fs-eye:          10px;   --tr-eye:         0.18em;
+
+  /* ── Rhythm ───────────────────────────────────────────────────────────── */
+  --space-1:    8px;
+  --space-2:   12px;
+  --space-3:   16px;
+  --space-4:   24px;
+  --space-5:   32px;
+  --space-6:   48px;
+  --space-7:   56px;
+  --space-8:   80px;
+  --space-9:  100px;
+
+  --pad-section:     100px 64px 80px;
+  --pad-section-sm:  52px 20px 44px;
+  --pad-hero:        80px 64px;
+
+  /* ── Borders + shadow ─────────────────────────────────────────────────── */
+  --hairline:        0.5px solid var(--ink);
+  --hairline-soft:   0.5px solid var(--rule);
+  --hairline-strong: 1px solid var(--ink);
+  --dash:            0.5px dashed var(--ink-soft);
+
+  --shadow-sm: 0 4px 12px rgba(26, 24, 22, 0.16);
+  --shadow-md: 0 6px 18px rgba(26, 24, 22, 0.14);
+  --shadow-lg: 0 8px 28px rgba(26, 24, 22, 0.26);
+
+  --ease:   cubic-bezier(0.16, 1, 0.3, 1);
+  --dur-quick: 180ms;
+  --dur:       260ms;
+  --dur-slow:  850ms;
+}
+
+/* ── Page reset ────────────────────────────────────────────────────────────── */
+html, body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--sans);
+  font-feature-settings: "palt";
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* ── Semantic type — opt in via class names ────────────────────────────────── */
+.tk-h1,
+.tk-hero {
+  font-family: var(--serif);
+  font-weight: 300;
+  font-size: var(--fs-hero);
+  line-height: var(--lh-hero);
+  letter-spacing: var(--tr-hero);
+  color: var(--ink);
+  margin: 0;
+}
+.tk-hero-jp {
+  font-family: var(--jp-serif);
+  font-weight: 300;
+}
+
+.tk-h2 {
+  font-family: var(--serif);
+  font-style: italic;
+  font-weight: 300;
+  font-size: var(--fs-section);
+  line-height: var(--lh-section);
+  letter-spacing: var(--tr-section);
+  color: var(--ink);
+  margin: 0;
+}
+
+.tk-h3 {
+  font-family: var(--jp-serif);
+  font-weight: 500;
+  font-size: var(--fs-h3);
+  line-height: var(--lh-h3);
+  margin: 0;
+}
+
+.tk-display-md {
+  font-family: var(--serif);
+  font-style: italic;
+  font-weight: 300;
+  font-size: var(--fs-display-md);
+  line-height: var(--lh-display-md);
+}
+
+.tk-quote {
+  font-family: var(--jp-serif);
+  font-style: italic;
+  font-weight: 300;
+  font-size: var(--fs-quote);
+  line-height: var(--lh-quote);
+}
+
+.tk-body-lg {
+  font-family: var(--jp-serif);
+  font-weight: 400;
+  font-size: var(--fs-body-lg);
+  line-height: var(--lh-body-lg);
+}
+
+.tk-body {
+  font-family: var(--jp-serif);
+  font-weight: 400;
+  font-size: var(--fs-body);
+  line-height: var(--lh-body);
+}
+
+.tk-body-sm {
+  font-family: var(--jp-serif);
+  font-weight: 400;
+  font-size: var(--fs-body-sm);
+  line-height: var(--lh-body-sm);
+}
+
+.tk-meta {
+  font-family: var(--jp-serif);
+  font-size: var(--fs-meta);
+  line-height: var(--lh-meta);
+  color: var(--ink-soft);
+}
+
+.tk-eye {
+  font-family: var(--mono);
+  font-size: var(--fs-eye);
+  letter-spacing: var(--tr-eye);
+  text-transform: uppercase;
+  color: var(--ink-soft);
+}
+
+.tk-mono {
+  font-family: var(--mono);
+  font-size: var(--fs-mono);
+  letter-spacing: 0.02em;
+}
+
+.tk-serif       { font-family: var(--serif); }
+.tk-jp-serif    { font-family: var(--jp-serif); }
+.tk-italic      { font-style: italic; }
+
+/* ── Structural utilities ──────────────────────────────────────────────────── */
+.tk-rule        { border-top: 1px solid var(--rule); }
+.tk-thinrule    { border-top: var(--hairline); }
+.tk-vrule       { border-left: 1px solid var(--rule); }
+.tk-divider     { border-top: var(--hairline-strong); }
+
+/* ── Marks (stamps, tags, page numbers, dropcap) ───────────────────────────── */
+.tk-stamp {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid var(--ink);
+  padding: 4px 10px;
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+}
+
+.tk-tag {
+  display: inline-block;
+  padding: 3px 8px;
+  border: 0.5px solid var(--ink-soft);
+  border-radius: 999px;
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  color: var(--ink-soft);
+  text-transform: uppercase;
+}
+
+.tk-page {
+  font-family: var(--serif);
+  font-style: italic;
+  font-weight: 400;
+  font-size: 14px;
+  color: var(--ink-soft);
+}
+
+.tk-dropcap::first-letter {
+  font-family: var(--serif);
+  font-weight: 500;
+  font-size: 5.2em;
+  line-height: 0.85;
+  float: left;
+  padding: 0.05em 0.12em 0 0;
+  color: var(--wood-deep);
+}
+
+/* ── Image placeholder (135° striped paper) ───────────────────────────────── */
+.tk-img {
+  position: relative;
+  background:
+    repeating-linear-gradient(135deg,
+      rgba(31, 24, 16, 0.04) 0 6px,
+      rgba(31, 24, 16, 0.00) 6px 14px),
+    var(--paper);
+  overflow: hidden;
+  border: 1px solid var(--rule);
+}
+.tk-img-label {
+  position: absolute;
+  left: 12px; bottom: 10px;
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  color: var(--ink-soft);
+  text-transform: uppercase;
+}
+.tk-img-num {
+  position: absolute;
+  right: 10px; top: 8px;
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--ink-soft);
+}
+
+/* ── Buttons (canonical: filled + outline) ────────────────────────────────── */
+.tk-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 18px;
+  border: 1px solid var(--ink);
+  background: transparent;
+  color: var(--ink);
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  cursor: pointer;
+  text-decoration: none;
+  transition: background var(--dur-quick) var(--ease),
+              color      var(--dur-quick) var(--ease),
+              transform  var(--dur-quick) var(--ease),
+              box-shadow var(--dur)        var(--ease);
+}
+.tk-btn:hover {
+  background: var(--ink);
+  color: var(--bg);
+  transform: translateY(-2px);
+}
+.tk-btn-fill {
+  background: var(--ink);
+  color: var(--bg);
+}
+.tk-btn-fill:hover {
+  background: var(--wood-deep);
+  border-color: var(--wood-deep);
+  box-shadow: var(--shadow-lg);
+}
+
+.tk-btn-lg {
+  padding: 16px 28px;
+  font-size: 12px;
+  letter-spacing: 0.16em;
+}
+
+/* ── Status dot ───────────────────────────────────────────────────────────── */
+.tk-status {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+.tk-status-live   { color: var(--sage-deep); }
+.tk-status-soon   { color: var(--ink-soft); }
+.tk-status::before {
+  content: "● ";
+}
+
+/* ── Section sign helper ───────────────────────────────────────────────────── */
+.tk-section-sign::before {
+  content: "§ ";
+}
