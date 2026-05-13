@@ -901,6 +901,27 @@ body[data-mode="overlay"] #stage .pageWrap .frame-diff { display: none; }
   font-size: 10px;
 }
 
+/* empty-notice: full-width bottom strip inside #empty */
+.empty-notice {
+  grid-column: 1 / -1;
+  padding-top: 14px;
+  border-top: var(--hairline-soft);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 10px;
+  font-family: var(--mono);
+  font-size: 9px;
+  letter-spacing: 0.1em;
+  color: var(--ink-soft);
+  line-height: 1.8;
+}
+.notice-privacy  { color: var(--sage-deep); }
+.notice-sep      { color: var(--rule); }
+.notice-credit a { color: var(--ink-soft); text-decoration: underline; text-underline-offset: 2px; }
+.notice-credit a:hover { color: var(--ink); }
+.notice-disclaimer { opacity: 0.75; }
+
 /* ====================================================================
  * Footer
  * ==================================================================== */
