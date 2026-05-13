@@ -6,7 +6,7 @@
 <title>PDF Diff Checker — タコまる 道具</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <link rel="stylesheet" href="colors_and_type.css">
-<link rel="stylesheet" href="pdfDiff.css?v=20260513">
+<link rel="stylesheet" href="pdfDiff.css?v=20260513b">
 </head>
 <body data-mode="sbs">
 
@@ -34,7 +34,20 @@
   <div class="header-actions">
     <button id="btnInfo" class="btn btn-ghost">§ INFO</button>
     <button id="btnExport" class="btn">JSON — 出力</button>
-    <button id="btnExportHtml" class="btn fill">レポート — REPORT</button>
+    <span class="report-split" id="reportSplit">
+      <button id="btnExportHtml" class="btn fill" title="全差分レポートを出力">レポート — REPORT</button>
+      <button id="btnExportHtmlMenu" class="btn fill btn-caret" aria-haspopup="menu" aria-expanded="false" title="出力種別を選択">▼</button>
+      <div class="report-menu" id="reportMenu" role="menu" hidden>
+        <button type="button" role="menuitem" data-report-mode="full">
+          <span class="rm-en">FULL REPORT</span>
+          <span class="rm-jp">全差分レポート — チェック状態バッジ付き</span>
+        </button>
+        <button type="button" role="menuitem" data-report-mode="unresolved">
+          <span class="rm-en">UNRESOLVED ONLY</span>
+          <span class="rm-jp">未チェック差分のみのレポート</span>
+        </button>
+      </div>
+    </span>
   </div>
 </header>
 
@@ -69,6 +82,16 @@
       <span id="diffStats">— · NO DATA</span>
       <span class="title">Differences</span>
       <span class="jp">— 検出された差分の索引</span>
+    </div>
+    <div class="bulk-ops" id="bulkOps" hidden>
+      <span class="bulk-eye">§ REVIEW</span>
+      <button type="button" id="btnCheckAll" class="bulk-btn" title="全件チェック">✓ ALL</button>
+      <button type="button" id="btnUncheckAll" class="bulk-btn" title="全件解除">□ NONE</button>
+      <span class="spacer"></span>
+      <label class="bulk-toggle" title="チェック済みの行を非表示">
+        <input type="checkbox" id="chkHideChecked">
+        <span>チェック済みを隠す</span>
+      </label>
     </div>
     <div id="diffList">
       <div class="diff-empty">
@@ -264,6 +287,6 @@
   <div class="loader-progress" id="loaderProgress">準備中</div>
 </div>
 
-<script src="pdfDiff.js?v=20260513"></script>
+<script src="pdfDiff.js?v=20260513b"></script>
 </body>
 </html>

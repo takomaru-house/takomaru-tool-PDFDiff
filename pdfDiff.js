@@ -22,6 +22,7 @@ const state = {
   zoom: null,
   beforeRange: { start: 1, end: 1 },
   afterRange:  { start: 1, end: 1 },
+  hideChecked: false,
 };
 
 const $ = (s) => document.querySelector(s);
@@ -29,6 +30,7 @@ const els = {
   fileBefore: $('#fileBefore'), fileAfter: $('#fileAfter'),
   nameBefore: $('#nameBefore'), nameAfter: $('#nameAfter'),
   diffList: $('#diffList'), diffStats: $('#diffStats'),
+  bulkOps: $('#bulkOps'),
   stage: $('#stage'), status: $('#status'),
   pageLabel: $('#pageLabel'), pageNav: $('#pageNav'),
   empty: $('#empty'),
@@ -230,6 +232,7 @@ async function runDiff() {
       state.diffsByPage.push({
         pageIndex: i, regions: [], textDiffs: [],
         diffCanvas: null, w: 0, h: 0, missing: pa ? 'after' : 'before',
+        missingChecked: false,
         beforePage: state.beforeRange.start + i,
         afterPage:  state.afterRange.start + i,
       });
@@ -243,6 +246,7 @@ async function runDiff() {
     const ib = cb.getContext('2d').getImageData(0, 0, w, h);
     const { mask, regions, diffCanvas } = pixelDiff(ia, ib, w, h);
     const textDiffs = textDiff(pa.texts, pb.texts, regions);
+    textDiffs.forEach(d => { d.checked = false; });
     state.diffsByPage.push({
       pageIndex: i,
       beforePage: state.beforeRange.start + i,
@@ -409,61 +413,229 @@ function intersect(t, x, y, w, h) {
 }
 
 // ---- レンダリング ----
+function countChecked(diffsByPage) {
+  let total = 0, checked = 0;
+  diffsByPage.forEach(p => {
+    if (p.missing) {
+      total += 1;
+      if (p.missingChecked) checked += 1;
+      return;
+    }
+    p.textDiffs.forEach(d => {
+      total += 1;
+      if (d.checked) checked += 1;
+    });
+  });
+  return { total, checked };
+}
+
+function updateDiffStats() {
+  const { total, checked } = countChecked(state.diffsByPage);
+  els.diffStats.textContent =
+    `${total} ITEMS · ${state.diffsByPage.length} PG · ${checked} CHECKED`;
+}
+
+function applyCheckedStyle(item, isChecked) {
+  item.classList.toggle('checked', !!isChecked);
+}
+
+function buildCheckbox(isChecked, onToggle) {
+  const label = document.createElement('label');
+  label.className = 'diff-check';
+  label.title = 'チェック — レビュー済みにする';
+  const box = document.createElement('input');
+  box.type = 'checkbox';
+  box.checked = !!isChecked;
+  box.addEventListener('click', e => e.stopPropagation());
+  box.addEventListener('change', e => {
+    e.stopPropagation();
+    onToggle(box.checked);
+  });
+  label.addEventListener('click', e => e.stopPropagation());
+  label.appendChild(box);
+  return { label, box };
+}
+
 function renderDiffList() {
   const lst = els.diffList;
   lst.innerHTML = '';
-  let total = 0;
+  if (els.bulkOps) els.bulkOps.hidden = state.diffsByPage.length === 0;
   state.diffsByPage.forEach((p, idx) => {
     const group = document.createElement('div');
     group.className = 'diff-page-group';
     const title = document.createElement('div');
     title.className = 'diff-page-title';
-    title.innerHTML =
+
+    const totalOnPage = p.missing ? 1 : p.textDiffs.length;
+    const checkedOnPage = p.missing
+      ? (p.missingChecked ? 1 : 0)
+      : p.textDiffs.filter(d => d.checked).length;
+
+    const titleMain = document.createElement('span');
+    titleMain.className = 'diff-page-title-main';
+    titleMain.innerHTML =
       `<span class="pagenum">p. ${String(idx + 1).padStart(2, '0')}</span>` +
       ` · BEFORE p${p.beforePage} ↔ AFTER p${p.afterPage}` +
-      ` · ${p.textDiffs.length} 件`;
+      ` · <span class="page-progress">${checkedOnPage} / ${totalOnPage} checked</span>`;
+    title.appendChild(titleMain);
+
+    if (totalOnPage > 0) {
+      const actions = document.createElement('span');
+      actions.className = 'page-check-actions';
+      const btnAll = document.createElement('button');
+      btnAll.type = 'button';
+      btnAll.className = 'page-check-btn';
+      btnAll.title = 'このページの差分を全てチェック';
+      btnAll.textContent = '✓ ALL';
+      btnAll.addEventListener('click', () => setPageChecked(idx, true));
+      const btnNone = document.createElement('button');
+      btnNone.type = 'button';
+      btnNone.className = 'page-check-btn';
+      btnNone.title = 'このページのチェックを全て解除';
+      btnNone.textContent = '□ NONE';
+      btnNone.addEventListener('click', () => setPageChecked(idx, false));
+      actions.appendChild(btnAll);
+      actions.appendChild(btnNone);
+      title.appendChild(actions);
+    }
     group.appendChild(title);
+
     if (p.missing) {
       const item = document.createElement('div');
-      item.className = 'diff-item';
-      item.innerHTML = `<span class="badge ${p.missing === 'after' ? 'remove' : 'add'}">
-        ${p.missing === 'after' ? 'PAGE-DEL' : 'PAGE-ADD'}
-      </span><div class="meta"><div class="text"><span class="visual-note">この側のドキュメントには対応するページがありません。</span></div></div>`;
+      item.className = 'diff-item missing-item';
+      item.dataset.page = idx;
+      item.dataset.region = '__missing__';
+      applyCheckedStyle(item, p.missingChecked);
+      const { label } = buildCheckbox(p.missingChecked, (val) => {
+        p.missingChecked = val;
+        applyCheckedStyle(item, val);
+        updateDiffStats();
+        refreshPageProgress(idx);
+      });
+      const badgeClass = p.missing === 'after' ? 'remove' : 'add';
+      const badgeText = p.missing === 'after' ? 'PAGE-DEL' : 'PAGE-ADD';
+      const badge = document.createElement('span');
+      badge.className = `badge ${badgeClass}`;
+      badge.textContent = badgeText;
+      const meta = document.createElement('div');
+      meta.className = 'meta';
+      meta.innerHTML = `<div class="text"><span class="visual-note">この側のドキュメントには対応するページがありません。</span></div>`;
+      item.appendChild(label);
+      item.appendChild(badge);
+      item.appendChild(meta);
+      item.addEventListener('click', () => focusDiff(idx, '__missing__'));
       group.appendChild(item);
       lst.appendChild(group);
       return;
     }
+
     p.textDiffs.forEach((d) => {
-      total++;
       const item = document.createElement('div');
       item.className = 'diff-item';
       item.dataset.page = idx;
       item.dataset.region = d.regionId;
+      applyCheckedStyle(item, d.checked);
       const badgeMap = { add: '追加', remove: '削除', change: '変更', visual: '視覚' };
       let textHtml = '';
       if (d.kind === 'add') textHtml = `<ins>${escapeHtml(trim(d.after))}</ins>`;
       else if (d.kind === 'remove') textHtml = `<del>${escapeHtml(trim(d.before))}</del>`;
       else if (d.kind === 'change') textHtml = `<del>${escapeHtml(trim(d.before))}</del> → <ins>${escapeHtml(trim(d.after))}</ins>`;
       else textHtml = '<span class="visual-note">テキスト変更なし — 図形・線・色などの差異。</span>';
-      item.innerHTML = `
-        <span class="badge ${d.kind}">${badgeMap[d.kind]}</span>
-        <div class="meta">
-          <div class="pos">[${d.regionId}] x ${(d.bbox[0]/RENDER_SCALE)|0} · y ${(d.bbox[1]/RENDER_SCALE)|0} · ${(d.bbox[2]/RENDER_SCALE)|0}×${(d.bbox[3]/RENDER_SCALE)|0}px</div>
-          <div class="text">${textHtml}</div>
-        </div>`;
+
+      const { label } = buildCheckbox(d.checked, (val) => {
+        d.checked = val;
+        applyCheckedStyle(item, val);
+        updateDiffStats();
+        refreshPageProgress(idx);
+      });
+      item.appendChild(label);
+
+      const badge = document.createElement('span');
+      badge.className = `badge ${d.kind}`;
+      badge.textContent = badgeMap[d.kind];
+      item.appendChild(badge);
+
+      const meta = document.createElement('div');
+      meta.className = 'meta';
+      meta.innerHTML = `
+        <div class="pos">[${d.regionId}] x ${(d.bbox[0]/RENDER_SCALE)|0} · y ${(d.bbox[1]/RENDER_SCALE)|0} · ${(d.bbox[2]/RENDER_SCALE)|0}×${(d.bbox[3]/RENDER_SCALE)|0}px</div>
+        <div class="text">${textHtml}</div>`;
+      item.appendChild(meta);
+
       item.addEventListener('click', () => focusDiff(idx, d.regionId));
       group.appendChild(item);
     });
     if (p.textDiffs.length === 0) {
       const empty = document.createElement('div');
-      empty.className = 'diff-item';
-      empty.innerHTML = `<span class="badge visual">— · 差分</span>
+      empty.className = 'diff-item empty-item';
+      empty.innerHTML = `<span class="diff-check-spacer"></span>
+        <span class="badge visual">— · 差分</span>
         <div class="meta"><div class="text"><span class="visual-note">このページに差分はありません。</span></div></div>`;
       group.appendChild(empty);
     }
     lst.appendChild(group);
   });
-  els.diffStats.textContent = `${total} ITEMS · ${state.diffsByPage.length} PG`;
+  updateDiffStats();
+}
+
+function refreshPageProgress(pageIdx) {
+  const p = state.diffsByPage[pageIdx];
+  if (!p) return;
+  const totalOnPage = p.missing ? 1 : p.textDiffs.length;
+  const checkedOnPage = p.missing
+    ? (p.missingChecked ? 1 : 0)
+    : p.textDiffs.filter(d => d.checked).length;
+  const group = els.diffList.querySelectorAll('.diff-page-group')[pageIdx];
+  if (!group) return;
+  const prog = group.querySelector('.page-progress');
+  if (prog) prog.textContent = `${checkedOnPage} / ${totalOnPage} checked`;
+}
+
+function setPageChecked(pageIdx, value) {
+  const p = state.diffsByPage[pageIdx];
+  if (!p) return;
+  if (p.missing) {
+    p.missingChecked = !!value;
+  } else {
+    p.textDiffs.forEach(d => { d.checked = !!value; });
+  }
+  syncCheckboxesForPage(pageIdx);
+  refreshPageProgress(pageIdx);
+  updateDiffStats();
+}
+
+function syncCheckboxesForPage(pageIdx) {
+  const group = els.diffList.querySelectorAll('.diff-page-group')[pageIdx];
+  if (!group) return;
+  const p = state.diffsByPage[pageIdx];
+  group.querySelectorAll('.diff-item').forEach((item) => {
+    const region = item.dataset.region;
+    if (!region) return;
+    let isChecked = false;
+    if (region === '__missing__') isChecked = !!p.missingChecked;
+    else {
+      const d = p.textDiffs.find(x => x.regionId === region);
+      isChecked = !!(d && d.checked);
+    }
+    applyCheckedStyle(item, isChecked);
+    const box = item.querySelector('input[type="checkbox"]');
+    if (box) box.checked = isChecked;
+  });
+}
+
+function setAllChecked(value) {
+  state.diffsByPage.forEach((p, idx) => {
+    if (p.missing) p.missingChecked = !!value;
+    else p.textDiffs.forEach(d => { d.checked = !!value; });
+    syncCheckboxesForPage(idx);
+    refreshPageProgress(idx);
+  });
+  updateDiffStats();
+}
+
+function setHideChecked(value) {
+  state.hideChecked = !!value;
+  els.diffList.classList.toggle('hide-checked', state.hideChecked);
 }
 function escapeHtml(s) { return s.replace(/[<>&]/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;'}[c])); }
 function trim(s) { return s.length > 80 ? s.slice(0, 80) + '…' : s; }
@@ -662,9 +834,35 @@ $('#btnNext').addEventListener('click', () => {
 });
 
 window.addEventListener('keydown', (e) => {
-  if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+  const tag = e.target.tagName;
+  if (tag === 'INPUT' || tag === 'TEXTAREA') return;
   if (e.key === 'ArrowLeft')  { $('#btnPrev').click(); return; }
   if (e.key === 'ArrowRight') { $('#btnNext').click(); return; }
+  if (e.key === ' ' || e.code === 'Space') {
+    const sel = document.querySelector('.diff-item.selected');
+    if (!sel) return;
+    e.preventDefault();
+    const pageIdx = parseInt(sel.dataset.page, 10);
+    const region  = sel.dataset.region;
+    const p = state.diffsByPage[pageIdx];
+    if (!p) return;
+    let nowChecked;
+    if (region === '__missing__') {
+      p.missingChecked = !p.missingChecked;
+      nowChecked = p.missingChecked;
+    } else {
+      const d = p.textDiffs.find(x => x.regionId === region);
+      if (!d) return;
+      d.checked = !d.checked;
+      nowChecked = d.checked;
+    }
+    applyCheckedStyle(sel, nowChecked);
+    const box = sel.querySelector('input[type="checkbox"]');
+    if (box) box.checked = nowChecked;
+    refreshPageProgress(pageIdx);
+    updateDiffStats();
+    return;
+  }
   let dir = 0;
   if (e.key === 'ArrowDown' || e.key === 'j') dir = 1;
   else if (e.key === 'ArrowUp' || e.key === 'k') dir = -1;
@@ -750,26 +948,77 @@ $('#btnExport').addEventListener('click', () => {
     page: i + 1,
     before_page: p.beforePage,
     after_page: p.afterPage,
+    missing: p.missing || null,
+    missing_checked: p.missing ? !!p.missingChecked : undefined,
     diffs: p.textDiffs.map(d => ({
+      region_id: d.regionId,
       kind: d.kind,
       bbox_px: [
         (d.bbox[0]/RENDER_SCALE)|0, (d.bbox[1]/RENDER_SCALE)|0,
         (d.bbox[2]/RENDER_SCALE)|0, (d.bbox[3]/RENDER_SCALE)|0
       ],
       before: d.before, after: d.after,
+      checked: !!d.checked,
     })),
   }));
   download('pdf-diff.json', JSON.stringify(out, null, 2), 'application/json');
 });
-$('#btnExportHtml').addEventListener('click', exportHtmlReport);
 
-function exportHtmlReport() {
+// レポート: スプリットボタン (主ボタン = FULL, ▼ で UNRESOLVED を選択)
+$('#btnExportHtml').addEventListener('click', () => exportHtmlReport('full'));
+
+function filterForReport(diffsByPage, mode) {
+  if (mode === 'full') return diffsByPage;
+  // unresolved: チェック済み差分を除外。残ゼロのページは欠落ページ以外を除外。
+  return diffsByPage
+    .map(p => ({ ...p, textDiffs: p.textDiffs.filter(d => !d.checked) }))
+    .filter(p => p.textDiffs.length > 0 || (p.missing && !p.missingChecked));
+}
+
+function exportHtmlReport(mode) {
   if (!state.diffsByPage.length) { alert('比較データがありません'); return; }
-  let body = '<h1>PDF差分レポート — タコまる Diff Reader</h1><p>生成日時: ' + new Date().toLocaleString() + '</p>';
-  state.diffsByPage.forEach((p, idx) => {
-    body += '<h2>p. ' + String(idx + 1).padStart(2,'0') + ' — Before p' + p.beforePage + ' ↔ After p' + p.afterPage + '</h2>';
+  const reportMode = (mode === 'unresolved') ? 'unresolved' : 'full';
+  const filtered = filterForReport(state.diffsByPage, reportMode);
+  const stats = countChecked(state.diffsByPage);
+  const unresolved = stats.total - stats.checked;
+
+  const titleEn = reportMode === 'unresolved'
+    ? 'PDF Diff Report — Unresolved Only'
+    : 'PDF Diff Report — Full';
+  const titleJp = reportMode === 'unresolved'
+    ? 'PDF差分レポート（未チェック差分のみ）'
+    : 'PDF差分レポート（全差分）';
+
+  let body = `<h1>${titleJp}<span class="subtitle"> — タコまる Diff Reader</span></h1>`;
+  body += `<p class="meta">生成日時: ${new Date().toLocaleString()}`;
+  body += ` ／ 総差分 ${stats.total} 件 — チェック済み ${stats.checked} 件 / 未チェック ${unresolved} 件`;
+  if (reportMode === 'unresolved') body += ` ／ <b>本レポートは未チェック差分のみを掲載</b>`;
+  body += `</p>`;
+
+  if (filtered.length === 0) {
+    body += `<p class="empty-msg">— 出力対象の差分はありません（すべての差分がチェック済み）。</p>`;
+  }
+
+  filtered.forEach((p) => {
+    const idx = p.pageIndex;
+    body += `<h2>p. ${String(idx + 1).padStart(2,'0')} — Before p${p.beforePage} ↔ After p${p.afterPage}</h2>`;
+    if (p.missing) {
+      const badge = reportMode === 'full'
+        ? (p.missingChecked
+            ? '<span class="rstat checked">☑ CHECKED</span>'
+            : '<span class="rstat unresolved">☐ UNRESOLVED</span>')
+        : '<span class="rstat unresolved">☐ UNRESOLVED</span>';
+      body += `<p>${badge} <b>[${p.missing === 'after' ? 'PAGE-DEL' : 'PAGE-ADD'}]</b> この側のドキュメントには対応するページがありません。</p>`;
+      return;
+    }
+    // ページ単位のチェック進捗（FULLモードのみ表示）
+    if (reportMode === 'full') {
+      const onPage = p.textDiffs.length;
+      const onPageChecked = p.textDiffs.filter(d => d.checked).length;
+      body += `<p class="page-stats">${onPageChecked} / ${onPage} checked</p>`;
+    }
     if (p.diffCanvas) {
-      body += '<img src="' + p.diffCanvas.toDataURL('image/png') + '" style="max-width:100%; border:1px solid #d8cfbe">';
+      body += `<img src="${p.diffCanvas.toDataURL('image/png')}" style="max-width:100%; border:1px solid #d8cfbe">`;
     }
     body += '<ul>';
     p.textDiffs.forEach(d => {
@@ -784,17 +1033,36 @@ function exportHtmlReport() {
       } else {
         txt = '<del style="color:#b35a3a">' + escapeHtml(d.before) + '</del> → <ins style="background:rgba(91,107,74,.10);color:#3d4a32;text-decoration:none">' + escapeHtml(d.after) + '</ins>';
       }
-      body += '<li><b>[' + k + ']</b> ' + txt + '</li>';
+      const statusBadge = reportMode === 'full'
+        ? (d.checked
+            ? '<span class="rstat checked">☑ CHECKED</span> '
+            : '<span class="rstat unresolved">☐ UNRESOLVED</span> ')
+        : '';
+      body += `<li>${statusBadge}<b>[${k}]</b> ${txt}</li>`;
     });
     body += '</ul>';
   });
-  const html = '<!doctype html><html lang="ja"><head><meta charset="utf-8"><title>PDF差分レポート — タコまる</title>' +
-    '<style>body{font-family:"Noto Serif JP",serif; color:#1a1816; background:#faf8f3; max-width:1100px; margin:24px auto; padding:0 16px} ' +
-    'h1{font-family:"Cormorant Garamond",serif; font-style:italic; font-weight:300; font-size:48px; margin:0 0 8px} ' +
-    'h2{margin-top:32px; border-bottom:0.5px solid #1a1816; padding-bottom:6px; font-family:"Cormorant Garamond",serif; font-style:italic; font-weight:300; font-size:28px} ' +
-    'li{margin:6px 0}</style>' +
+
+  const css =
+    'body{font-family:"Noto Serif JP",serif; color:#1a1816; background:#faf8f3; max-width:1100px; margin:24px auto; padding:0 16px}' +
+    'h1{font-family:"Cormorant Garamond",serif; font-style:italic; font-weight:300; font-size:44px; margin:0 0 8px}' +
+    'h1 .subtitle{font-size:18px; color:#4a4640}' +
+    'h2{margin-top:32px; border-bottom:0.5px solid #1a1816; padding-bottom:6px; font-family:"Cormorant Garamond",serif; font-style:italic; font-weight:300; font-size:26px}' +
+    'p.meta{font-family:JetBrains Mono,ui-monospace,monospace; font-size:11px; letter-spacing:0.06em; color:#4a4640; text-transform:uppercase}' +
+    'p.page-stats{font-family:JetBrains Mono,ui-monospace,monospace; font-size:10px; letter-spacing:0.12em; color:#4a4640; text-transform:uppercase; margin:6px 0 12px}' +
+    'p.empty-msg{font-style:italic; color:#4a4640; margin:24px 0}' +
+    'li{margin:6px 0; line-height:1.65}' +
+    '.rstat{display:inline-block; font-family:JetBrains Mono,ui-monospace,monospace; font-size:9px; letter-spacing:0.14em; padding:1px 6px; border:0.5px solid #c8bfae; border-radius:999px; vertical-align:middle; margin-right:6px}' +
+    '.rstat.checked{color:#5b6b4a; border-color:#a8b497}' +
+    '.rstat.unresolved{color:#b35a3a; border-color:#d9a995}';
+
+  const html = '<!doctype html><html lang="ja"><head><meta charset="utf-8"><title>' + escapeHtml(titleEn) + '</title>' +
+    '<style>' + css + '</style>' +
     '</head><body>' + body + '</body></html>';
-  download('pdf-diff-report.html', html, 'text/html');
+  const filename = reportMode === 'unresolved'
+    ? 'pdf-diff-report-unresolved.html'
+    : 'pdf-diff-report.html';
+  download(filename, html, 'text/html');
 }
 function download(name, content, mime) {
   const blob = new Blob([content], { type: mime });
@@ -804,6 +1072,53 @@ function download(name, content, mime) {
   a.click();
   setTimeout(() => URL.revokeObjectURL(a.href), 5000);
 }
+
+// ---- レポート: スプリットボタンのドロップダウン ----
+(function () {
+  const trigger = document.getElementById('btnExportHtmlMenu');
+  const menu    = document.getElementById('reportMenu');
+  if (!trigger || !menu) return;
+
+  const openMenu = () => {
+    menu.hidden = false;
+    trigger.setAttribute('aria-expanded', 'true');
+  };
+  const closeMenu = () => {
+    menu.hidden = true;
+    trigger.setAttribute('aria-expanded', 'false');
+  };
+  trigger.addEventListener('click', (e) => {
+    e.stopPropagation();
+    if (menu.hidden) openMenu(); else closeMenu();
+  });
+  menu.querySelectorAll('button[data-report-mode]').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const m = btn.dataset.reportMode;
+      closeMenu();
+      exportHtmlReport(m);
+    });
+  });
+  document.addEventListener('click', (e) => {
+    if (menu.hidden) return;
+    if (e.target === trigger) return;
+    if (menu.contains(e.target)) return;
+    closeMenu();
+  });
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && !menu.hidden) closeMenu();
+  });
+}());
+
+// ---- サイドバー: 一括操作 ----
+(function () {
+  const btnAll  = document.getElementById('btnCheckAll');
+  const btnNone = document.getElementById('btnUncheckAll');
+  const chkHide = document.getElementById('chkHideChecked');
+  if (btnAll)  btnAll.addEventListener('click', () => setAllChecked(true));
+  if (btnNone) btnNone.addEventListener('click', () => setAllChecked(false));
+  if (chkHide) chkHide.addEventListener('change', (e) => setHideChecked(e.target.checked));
+}());
 
 // 起動時に initial fit (空状態用)
 window.addEventListener('DOMContentLoaded', () => {
