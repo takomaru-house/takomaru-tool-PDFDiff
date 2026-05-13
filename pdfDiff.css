@@ -908,6 +908,9 @@ body[data-mode="overlay"] .opacity-control { display: inline-flex; }
   stroke-width: 1.5;
   transition: fill .2s, stroke-width .2s;
 }
+.canvasFrame svg.overlay rect.diffBox.checked:not(.selected) {
+  fill: none;
+}
 .canvasFrame svg.overlay rect.diffBox.selected {
   fill: rgba(179, 90, 58, 0.22);
   stroke: var(--rust);

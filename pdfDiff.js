@@ -439,6 +439,11 @@ function applyCheckedStyle(item, isChecked) {
   item.classList.toggle('checked', !!isChecked);
 }
 
+function syncRectCheckedClass(regionId, isChecked) {
+  document.querySelectorAll(`rect.diffBox[data-region="${regionId}"]`)
+    .forEach(r => r.classList.toggle('checked', !!isChecked));
+}
+
 function buildCheckbox(isChecked, onToggle) {
   const label = document.createElement('label');
   label.className = 'diff-check';
@@ -545,6 +550,7 @@ function renderDiffList() {
       const { label } = buildCheckbox(d.checked, (val) => {
         d.checked = val;
         applyCheckedStyle(item, val);
+        syncRectCheckedClass(d.regionId, val);
         updateDiffStats();
         refreshPageProgress(idx);
       });
@@ -597,7 +603,10 @@ function setPageChecked(pageIdx, value) {
   if (p.missing) {
     p.missingChecked = !!value;
   } else {
-    p.textDiffs.forEach(d => { d.checked = !!value; });
+    p.textDiffs.forEach(d => {
+      d.checked = !!value;
+      syncRectCheckedClass(d.regionId, !!value);
+    });
   }
   syncCheckboxesForPage(pageIdx);
   refreshPageProgress(pageIdx);
@@ -625,8 +634,14 @@ function syncCheckboxesForPage(pageIdx) {
 
 function setAllChecked(value) {
   state.diffsByPage.forEach((p, idx) => {
-    if (p.missing) p.missingChecked = !!value;
-    else p.textDiffs.forEach(d => { d.checked = !!value; });
+    if (p.missing) {
+      p.missingChecked = !!value;
+    } else {
+      p.textDiffs.forEach(d => {
+        d.checked = !!value;
+        syncRectCheckedClass(d.regionId, !!value);
+      });
+    }
     syncCheckboxesForPage(idx);
     refreshPageProgress(idx);
   });
@@ -683,6 +698,12 @@ function makeFrame(label, canvas, regions, cls, labelTone) {
   lab.textContent = label;
   f.appendChild(lab);
   if (regions && regions.length) {
+    const currentPage = state.diffsByPage[state.currentPage];
+    const checkedIds = new Set(
+      currentPage && currentPage.textDiffs
+        ? currentPage.textDiffs.filter(d => d.checked).map(d => d.regionId)
+        : []
+    );
     const svgNs = 'http://www.w3.org/2000/svg';
     const svg = document.createElementNS(svgNs, 'svg');
     svg.classList.add('overlay');
@@ -692,6 +713,7 @@ function makeFrame(label, canvas, regions, cls, labelTone) {
     for (const r of regions) {
       const rect = document.createElementNS(svgNs, 'rect');
       rect.classList.add('diffBox');
+      if (checkedIds.has(r.id)) rect.classList.add('checked');
       rect.dataset.region = r.id;
       rect.setAttribute('x', r.bbox[0]);
       rect.setAttribute('y', r.bbox[1]);
@@ -855,6 +877,7 @@ window.addEventListener('keydown', (e) => {
       if (!d) return;
       d.checked = !d.checked;
       nowChecked = d.checked;
+      syncRectCheckedClass(region, nowChecked);
     }
     applyCheckedStyle(sel, nowChecked);
     const box = sel.querySelector('input[type="checkbox"]');
