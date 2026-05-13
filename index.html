@@ -32,6 +32,7 @@
   </div>
 
   <div class="header-actions">
+    <button id="btnInfo" class="btn btn-ghost">§ INFO</button>
     <button id="btnExport" class="btn">JSON — 出力</button>
     <button id="btnExportHtml" class="btn fill">レポート — REPORT</button>
   </div>
@@ -148,13 +149,6 @@
             <button class="btn" id="btnSampleFloor2">間取り図のサンプル ▶</button>
           </div>
         </div>
-        <div class="empty-notice">
-          <span class="notice-privacy">🔒 ファイルはブラウザ内のみで処理されます — PDFは外部サーバーへ送信されません</span>
-          <span class="notice-sep">·</span>
-          <span class="notice-credit">Powered by <a href="https://mozilla.github.io/pdf.js/" target="_blank" rel="noopener noreferrer">PDF.js</a> (Apache 2.0) · Fonts via Google Fonts (SIL OFL)</span>
-          <span class="notice-sep">·</span>
-          <span class="notice-disclaimer">本ツールは現状のまま提供されます。利用により生じた損害について責任を負いません。</span>
-        </div>
       </div>
     </div>
 
@@ -169,6 +163,87 @@
       <span id="status">準備完了 — ready</span>
     </div>
   </main>
+</div>
+
+<!-- INFO モーダル -->
+<div id="infoModal" class="info-overlay" hidden>
+  <div class="info-panel" role="dialog" aria-modal="true" aria-label="情報・注意事項">
+    <div class="info-header">
+      <span class="info-eye">§ INFO · 情報</span>
+      <button id="btnInfoClose" class="info-close">✕ CLOSE</button>
+    </div>
+    <div class="info-body">
+
+      <section class="info-section">
+        <h3 class="info-section-title">§ USAGE · 使い方</h3>
+        <ol class="info-steps">
+          <li>
+            <span class="info-step-num">01</span>
+            <div>
+              <span class="info-step-en">SELECT FILES — ファイルを選択</span>
+              <span class="info-step-jp">ヘッダーの <b>BEFORE</b>（旧）と <b>AFTER</b>（新）ボタンを押して、比較したいPDFを2つ選択してください。</span>
+            </div>
+          </li>
+          <li>
+            <span class="info-step-num">02</span>
+            <div>
+              <span class="info-step-en">SET RANGE — 比較範囲を指定</span>
+              <span class="info-step-jp">ファイル読込後に表示される比較範囲バーで、BEFORE・AFTERそれぞれの開始・終了ページを入力します。全ページ比較する場合はそのままでOK。</span>
+            </div>
+          </li>
+          <li>
+            <span class="info-step-num">03</span>
+            <div>
+              <span class="info-step-en">COMPARE ▶ — 比較を実行</span>
+              <span class="info-step-jp"><b>比較を実行 — COMPARE ▶</b> ボタンを押すと差分を検出します。結果は左の索引に一覧表示されます。</span>
+            </div>
+          </li>
+        </ol>
+      </section>
+
+      <section class="info-section">
+        <h3 class="info-section-title">§ NOTICES · 注意事項</h3>
+        <ul class="info-list">
+          <li>
+            <span class="info-tag tag-safe">PRIVACY</span>
+            選択したPDFファイルはブラウザ内のみで処理されます。ファイルは外部サーバーへ送信されません。
+          </li>
+          <li>
+            <span class="info-tag">CDN</span>
+            フォント読込のため、起動時に Google Fonts サーバーへのリクエストが発生します（フォントデータのみ）。
+          </li>
+          <li>
+            <span class="info-tag">DISCLAIMER</span>
+            本ツールは現状のまま提供されます。利用により生じた損害について、作者は責任を負いません。
+          </li>
+        </ul>
+      </section>
+
+      <section class="info-section">
+        <h3 class="info-section-title">§ CREDITS · 使用ライブラリ</h3>
+        <ul class="info-credits">
+          <li>
+            <span class="info-credit-name">PDF.js</span>
+            <span class="info-credit-meta">Mozilla Foundation · <a href="https://mozilla.github.io/pdf.js/" target="_blank" rel="noopener noreferrer">mozilla.github.io/pdf.js</a> · Apache License 2.0</span>
+          </li>
+          <li>
+            <span class="info-credit-name">Cormorant Garamond</span>
+            <span class="info-credit-meta">Christian Thalmann · via Google Fonts · SIL Open Font License 1.1</span>
+          </li>
+          <li>
+            <span class="info-credit-name">Noto Serif JP / Noto Sans JP</span>
+            <span class="info-credit-meta">Google / Adobe · via Google Fonts · SIL Open Font License 1.1</span>
+          </li>
+          <li>
+            <span class="info-credit-name">JetBrains Mono</span>
+            <span class="info-credit-meta">JetBrains · via Google Fonts · SIL Open Font License 1.1</span>
+          </li>
+        </ul>
+        <p class="info-license-note">本ツールのソースコードは MIT License で公開しています。詳細は <a href="https://github.com/inumaru-kazuya/takomaru-tool-PDFDiff/blob/master/LICENSE" target="_blank" rel="noopener noreferrer">LICENSE</a> を参照してください。</p>
+      </section>
+
+    </div>
+  </div>
 </div>
 
 <!-- 差分計算中のオーバーレイ -->

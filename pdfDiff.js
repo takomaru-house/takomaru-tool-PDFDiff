@@ -809,3 +809,19 @@ function download(name, content, mime) {
 window.addEventListener('DOMContentLoaded', () => {
   _loader.init();
 });
+
+// ---- INFO モーダル ----
+(function () {
+  const modal   = document.getElementById('infoModal');
+  const btnOpen = document.getElementById('btnInfo');
+  const btnClose = document.getElementById('btnInfoClose');
+  if (!modal || !btnOpen || !btnClose) return;
+
+  const open  = () => modal.removeAttribute('hidden');
+  const close = () => modal.setAttribute('hidden', '');
+
+  btnOpen.addEventListener('click', open);
+  btnClose.addEventListener('click', close);
+  modal.addEventListener('click', (e) => { if (e.target === modal) close(); });
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !modal.hidden) close(); });
+}());
