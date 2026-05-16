@@ -6,7 +6,7 @@
 <title>PDF Diff Checker — タコまる 道具</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <link rel="stylesheet" href="colors_and_type.css">
-<link rel="stylesheet" href="pdfDiff.css?v=20260513c">
+<link rel="stylesheet" href="pdfDiff.css?v=20260516f">
 </head>
 <body data-mode="sbs">
 
@@ -32,6 +32,7 @@
   </div>
 
   <div class="header-actions">
+    <button id="btnEditMode" class="btn btn-ghost edit-toggle" type="button" title="ファイル・比較範囲を変更">✎ 編集</button>
     <button id="btnInfo" class="btn btn-ghost">§ INFO</button>
     <button id="btnExport" class="btn">JSON — 出力</button>
     <span class="report-split" id="reportSplit">
@@ -75,8 +76,15 @@
   <button id="btnCompare" class="btn fill">比較を実行 — COMPARE ▶</button>
 </div>
 
+<!-- モバイル: サイドバー開閉ボタン / 背景 -->
+<button id="sidebarToggle" class="mobile-only" type="button" aria-label="差分一覧を開く" aria-controls="sidebar" aria-expanded="false">
+  <span aria-hidden="true">≡</span>
+  <span class="badge-count" id="sidebarBadge" hidden>0</span>
+</button>
+<div id="sidebarBackdrop" class="sidebar-backdrop" aria-hidden="true"></div>
+
 <div id="layout">
-  <aside>
+  <aside id="sidebar">
     <div class="sidebar-header">
       <span class="eye">§ INDEX</span>
       <span id="diffStats">— · NO DATA</span>
@@ -287,6 +295,6 @@
   <div class="loader-progress" id="loaderProgress">準備中</div>
 </div>
 
-<script src="pdfDiff.js?v=20260513c"></script>
+<script src="pdfDiff.js?v=20260516f"></script>
 </body>
 </html>

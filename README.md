@@ -7,13 +7,13 @@ Claude Code 着手前の事前検証用パッケージ。仕様確認とアル�
 | ファイル | 説明 |
 |---|---|
 | `SPEC.md` | 仕様書本体（Claude Code への依頼内容） |
-| `mockup.html` / `mockup.css` / `mockup.js` | 動作するモックアップ一式（pdf.js 使用） |
-| `起動.bat` | ローカルサーバー起動用バッチ（Windows） |
+| `index.html` / `pdfDiff.css` / `pdfDiff.js` | 本体一式(pdf.js 使用)。ブラウザで `index.html` を直接開けば動作。 |
 | `samples/table_before.pdf` / `table_after.pdf` | 表データのサンプル（差分6箇所） |
 | `samples/floorplan_before.pdf` / `floorplan_after.pdf` | 間取り図のサンプル（差分5箇所） |
+| `samples/samples_data.js` | サンプルPDFのBase64データ。`file://` 直開きでもサンプルボタンを使えるようにするため。 |
 | `samples/diff_result_*.png` | 差分検出結果の事前プレビュー画像 |
 | `samples/gen_*.py` | サンプルPDF生成スクリプト |
-| `samples/verify_diff.py` | mockup と同じアルゴリズムをPythonで再現した検証スクリプト |
+| `samples/verify_diff.py` | 本体と同じアルゴリズムをPythonで再現した検証スクリプト |
 
 ## 比較フロー (UI操作)
 
@@ -40,21 +40,20 @@ Claude Code 着手前の事前検証用パッケージ。仕様確認とアル�
 
 ## モックアップの起動
 
-ブラウザのファイル選択（`<input type="file">`）でPDFを直接渡せばサーバーは不要。
-ただし「サンプルPDFを読み込むボタン」を使う場合は同一オリジンが必要なので、ローカルサーバー経由で開く。
+`index.html` をブラウザでダブルクリック(`file://` 直開き)で動作する。ローカルサーバーは不要。
 
-### 方法1: バッチ起動（Windows）
-```
-起動.bat をダブルクリック
-→ ブラウザで http://localhost:8765/mockup.html を開く
-```
+- 自分のPDFをファイル選択で渡す動作 → サーバー不要
+- サンプルPDFボタン → サンプルデータを `samples/samples_data.js` (Base64) として別ファイルに同梱しており、`file://` でも `<script>` 動的注入で読めるためサーバー不要
 
-### 方法2: コマンドラインから
-```
-cd D:\50-pdf差分検出ツール
-python -m http.server 8765
-```
-ブラウザで `http://localhost:8765/mockup.html` を開く。
+ローカルサーバーが必要なケースは特にないが、複数端末から同時アクセスしたい場合のみ任意で `python -m http.server 8765` 等で起動する。
+
+## モバイル(スマホ)対応
+
+- 幅 ≤ 820px で縦2段スプリットレイアウト(上: PDFビュー / 下: 差分索引)。
+- 比較完了後はファイル選択行・比較範囲バーを自動的に折りたたみ、ビュー領域を最大化。再変更したい場合はヘッダの「✎ 編集」をタップ。
+- ステージ上のタッチ操作: **1本指ドラッグ=パン / 2本指ピンチ=ズーム / ダブルタップ=FIT**。
+- iOS Safari (15+), Android Chrome 最新2世代で動作確認。
+- 詳細は `SPEC.md` §14 を参照。
 
 ## サンプルに仕込んだ差分（20ページ構成）
 
@@ -97,4 +96,6 @@ python -m http.server 8765
 - 差分リスト ⇄ ハイライト枠 の連動フォーカス（クリックで該当箇所へ移動・パルスアニメ）
 - 差分結果の JSON / HTML エクスポート
 - 拡張仕様: 画像ファイル（PNG/JPEG/WebP）入力にも対応
-- キーボードショートカット（←/→ ページ送り、J/
+- キーボードショートカット（←/→ ページ送り、J/K で差分送り、Space でチェックトグル）
+- 差分のレビューチェック機能(`SPEC.md` §13) — 各差分にチェックを付け、未チェックのみのレポート出力が可能
+- モバイル(スマホ)対応(`SPEC.md` §14) — 縦2段レイアウト・タッチ操作・ヘッダ自動圧縮

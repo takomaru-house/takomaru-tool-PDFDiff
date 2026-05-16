@@ -47,7 +47,9 @@ html, body {
 
 body {
   display: flex; flex-direction: column;
-  height: 100vh; overflow: hidden;
+  height: 100vh;
+  height: 100dvh;
+  overflow: hidden;
 }
 
 a { color: inherit; }
@@ -1418,15 +1420,290 @@ body[data-mode="overlay"] #stage .pageWrap .frame-diff { display: none; }
   min-height: 1em;
 }
 
-/* responsive */
-@media (max-width: 1100px) {
-  .app-header { grid-template-columns: 1fr; gap: 14px; padding: 14px 18px; }
-  .app-header .file-row { width: 100%; }
-  .header-actions { justify-content: flex-end; }
+/* ====================================================================
+ * Mobile drawer toggle — only visible on small screens
+ * ==================================================================== */
+
+.mobile-only { display: none; }
+
+#sidebarToggle {
+  position: fixed;
+  left: 14px;
+  bottom: 72px;
+  z-index: 60;
+  width: 48px;
+  height: 48px;
+  border-radius: 999px;
+  background: var(--ink);
+  color: var(--bg);
+  border: 1px solid var(--ink);
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  cursor: pointer;
+  box-shadow: var(--shadow-lg);
+  display: none;
+  align-items: center;
+  justify-content: center;
 }
-@media (max-width: 760px) {
-  #layout { grid-template-columns: 1fr; }
-  aside { display: none; }
-  #empty { grid-template-columns: 1fr; }
-  #empty .takomaru-mark { width: 80px; height: 80px; }
+#sidebarToggle .badge-count {
+  position: absolute;
+  top: -4px; right: -4px;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  background: var(--rust);
+  color: var(--bg);
+  border-radius: 999px;
+  font-size: 9px;
+  letter-spacing: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+#sidebarToggle .badge-count[hidden] { display: none; }
+
+.sidebar-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(26,24,22,0.45);
+  z-index: 49;
+  display: none;
+}
+.sidebar-backdrop.open { display: block; }
+
+/* ====================================================================
+ * Responsive
+ * ==================================================================== */
+
+@media (max-width: 1100px) {
+  .app-header {
+    grid-template-columns: 1fr;
+    gap: 14px;
+    padding: 14px 18px;
+  }
+  .app-header .file-row { width: 100%; }
+  .header-actions { justify-content: flex-end; flex-wrap: wrap; }
+}
+
+@media (max-width: 820px) {
+  /* header masthead — shrink title */
+  .app-header { padding: 12px 14px; }
+  .masthead { flex-wrap: wrap; gap: 8px 12px; }
+  .masthead h1 { font-size: 22px; }
+  .masthead .jp { font-size: 12px; }
+  .masthead .mark { width: 28px; height: 28px; }
+  .masthead .eye { display: none; }
+
+  /* file slots — stack, full width */
+  .file-row { flex-direction: column; }
+  .file-row .swap {
+    padding: 4px 0;
+    border-top: 1px solid rgba(250,248,243,0.18);
+    border-bottom: 1px solid rgba(250,248,243,0.18);
+    background: var(--ink);
+    color: var(--bg);
+    text-align: center;
+  }
+  .file-slot {
+    min-width: 0;
+    max-width: none;
+    width: 100%;
+  }
+  .file-slot + .file-slot {
+    border-left: 1px solid var(--ink);
+    border-top: 1px solid rgba(250,248,243,0.18);
+  }
+
+  /* compare bar — wrap and shrink */
+  #compareBar {
+    padding: 12px 14px;
+    gap: 12px 16px;
+  }
+  .cb-section { flex-wrap: wrap; }
+  .cb-summary {
+    flex: 1 0 100%;
+    padding-left: 0;
+    border-left: none;
+    border-top: var(--hairline-soft);
+    padding-top: 10px;
+    margin-top: 2px;
+    font-size: 15px;
+  }
+  #compareBar #btnCompare { flex: 1; min-width: 140px; }
+
+  /* layout — vertical split: 上(ビュー) / 下(索引) */
+  #layout {
+    grid-template-columns: 1fr;
+    grid-template-rows: 1fr clamp(180px, 35vh, 320px);
+    grid-template-areas:
+      "main"
+      "aside";
+  }
+  main  { grid-area: main;  min-height: 0; }
+  aside {
+    grid-area: aside;
+    min-height: 0;
+    border-right: none;
+    border-top: var(--hairline);
+  }
+  /* 空状態(まだ比較していない)では索引パネルを隠して、使い方説明を全画面で読めるようにする */
+  body:not(.has-pages) #layout {
+    grid-template-rows: 1fr;
+    grid-template-areas: "main";
+  }
+  body:not(.has-pages) aside { display: none; }
+
+  /* サイドバー見出し — モバイルでは1行に圧縮 */
+  aside .sidebar-header {
+    padding: 10px 16px;
+    gap: 8px;
+  }
+  aside .sidebar-header .title,
+  aside .sidebar-header .jp { display: none; }
+  .bulk-ops { padding: 6px 16px 8px; }
+  .bulk-toggle span { font-size: 8.5px; }
+
+  /* 差分項目 — モバイルではタップしやすく、横余白を縮める */
+  .diff-item { padding: 10px 16px; gap: 10px; }
+
+  /* ドロワー方式の名残を抑止 */
+  #sidebarToggle { display: none !important; }
+  .sidebar-backdrop { display: none !important; }
+  .mobile-only { display: none; }
+
+  /* === 比較後はビュー領域を最大化する ===
+     ファイル選択・比較範囲バーは完了済みUI、出力ボタン以外を圧縮 */
+  body.has-pages .app-header {
+    padding: 8px 12px;
+    gap: 6px 10px;
+    grid-template-columns: auto 1fr;
+  }
+  body.has-pages .masthead { gap: 6px 10px; }
+  body.has-pages .masthead h1 { font-size: 17px; }
+  body.has-pages .masthead .jp { display: none; }
+  body.has-pages .masthead .mark { width: 22px; height: 22px; }
+  body.has-pages .file-row { display: none; }
+  body.has-pages #compareBar { display: none; }
+  body.has-pages .header-actions { gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
+  body.has-pages .header-actions .btn,
+  body.has-pages .header-actions .report-split {
+    flex: 0 0 auto;
+  }
+  body.has-pages .header-actions .btn {
+    padding: 5px 9px;
+    font-size: 9px;
+    letter-spacing: 0.06em;
+  }
+  body.has-pages .header-actions .btn-caret { padding: 5px 7px; }
+
+  /* 編集ボタン — 比較後・モバイルでだけ表示 */
+  .edit-toggle { display: none; }
+  body.has-pages .edit-toggle {
+    display: inline-flex;
+    flex: 0 0 auto;
+  }
+
+  /* show-controls: 編集モード中だけ ファイル選択+範囲バー を再表示 */
+  body.has-pages.show-controls .file-row { display: flex; }
+  body.has-pages.show-controls #compareBar { display: flex; }
+  body.has-pages.show-controls .edit-toggle {
+    background: var(--wood-deep);
+    color: var(--bg);
+    border-color: var(--wood-deep);
+  }
+
+  /* toolbar — wrap, more compact */
+  #toolbar {
+    padding: 10px 14px;
+    gap: 12px 16px;
+  }
+  #toolbar .modes button {
+    padding: 7px 12px;
+    font-size: 9px;
+    letter-spacing: 0.12em;
+  }
+  .zoom-control { gap: 4px; }
+  .zoom-control .tool-eye { display: none; }
+  #renderInfo { display: none; }
+
+  /* stage — empty state needs to scroll on mobile so long instructions are reachable */
+  body:not(.has-pages) #stage {
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  body:not(.has-pages) #stage::after { display: none; }
+
+  /* empty card — flow from top so it can scroll, stack columns, tighten */
+  body:not(.has-pages) #empty {
+    position: relative;
+    top: auto; left: auto;
+    transform: none;
+    margin: 20px auto;
+  }
+  #empty {
+    width: min(560px, calc(100% - 32px));
+    padding: 28px 24px;
+    grid-template-columns: 1fr;
+    gap: 18px;
+  }
+  #empty .takomaru-mark {
+    width: 80px; height: 80px;
+    margin: 0 auto;
+  }
+  #empty h2 { font-size: 36px; }
+  #empty h2 .jp { font-size: 18px; }
+  #empty p { font-size: 13px; line-height: 1.85; }
+
+  /* view hint — hide on touch */
+  #viewHint { display: none; }
+
+  /* enable touch panning on the stage once pages are loaded */
+  body.has-pages #stage { touch-action: none; }
+
+  /* footer — compact, hide stamp */
+  #footerBar {
+    padding: 8px 14px;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+  .footer-stamp { display: none; }
+  #pageLabel { min-width: 0; font-size: 12px; padding: 0 4px; }
+  #status { font-size: 11px; }
+
+  /* report split menu — anchor right */
+  .report-menu { right: 0; left: auto; min-width: 220px; }
+
+  /* INFO modal — full width */
+  .info-panel { width: 100%; max-height: 100vh; height: 100vh; }
+  .info-header { padding: 14px 18px; }
+  .info-body { padding: 20px 18px 24px; gap: 22px; }
+}
+
+@media (max-width: 480px) {
+  .masthead h1 { font-size: 19px; }
+  .masthead .jp { display: none; }
+
+  .file-slot { padding: 10px 14px; }
+  .file-slot .name { font-size: 14px; }
+
+  /* header actions — full-width row */
+  .header-actions {
+    width: 100%;
+    justify-content: stretch;
+  }
+  .header-actions .btn,
+  .header-actions .report-split { flex: 1; }
+  .report-split #btnExportHtml { flex: 1; justify-content: center; }
+  #btnInfo { flex: 0 0 auto; }
+
+  /* compare bar — reduce font */
+  .cb-num { font-size: 16px; width: 44px; }
+  .cb-eye { display: none; }
+
+  /* empty card — minimal */
+  #empty { padding: 22px 18px; }
+  #empty h2 { font-size: 28px; }
+  #empty h2 .jp { font-size: 15px; }
+  #empty .samples .btn { width: 100%; justify-content: center; }
 }

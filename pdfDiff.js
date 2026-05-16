@@ -136,17 +136,42 @@ async function loadImage(buf, mime) {
   return { type: 'image', pages: [{ canvas, texts: [], viewport: null }] };
 }
 
+// 埋め込みデータのロード(初回のみ <script> を遅延注入)。
+// file:// で開かれた場合でも fetch を介さずに使えるようにするため。
+let _samplesDataPromise = null;
+function ensureSamplesData() {
+  if (window.SAMPLE_PDFS) return Promise.resolve(window.SAMPLE_PDFS);
+  if (_samplesDataPromise) return _samplesDataPromise;
+  _samplesDataPromise = new Promise((resolve, reject) => {
+    const s = document.createElement('script');
+    s.src = 'samples/samples_data.js';
+    s.onload = () => {
+      if (window.SAMPLE_PDFS) resolve(window.SAMPLE_PDFS);
+      else reject(new Error('SAMPLE_PDFS が見つかりませんでした'));
+    };
+    s.onerror = () => reject(new Error('samples_data.js の読み込みに失敗しました'));
+    document.head.appendChild(s);
+  });
+  return _samplesDataPromise;
+}
+
+function base64ToArrayBuffer(b64) {
+  const bin = atob(b64);
+  const len = bin.length;
+  const bytes = new Uint8Array(len);
+  for (let i = 0; i < len; i++) bytes[i] = bin.charCodeAt(i);
+  return bytes.buffer;
+}
+
 async function loadSample(name) {
   setStatus('サンプル取得中…');
   try {
-    const beforeUrl = `samples/${name}_before.pdf`;
-    const afterUrl  = `samples/${name}_after.pdf`;
-    const [b, a] = await Promise.all([
-      fetch(beforeUrl).then(r => { if (!r.ok) throw new Error(beforeUrl); return r.arrayBuffer(); }),
-      fetch(afterUrl).then(r => { if (!r.ok) throw new Error(afterUrl); return r.arrayBuffer(); }),
-    ]);
+    const data = await ensureSamplesData();
+    if (!data[name]) throw new Error(`サンプル "${name}" が定義されていません`);
+    const b = base64ToArrayBuffer(data[name].before);
+    const a = base64ToArrayBuffer(data[name].after);
     state.before = await loadPdf(b);
-    state.after = await loadPdf(a);
+    state.after  = await loadPdf(a);
     els.nameBefore.textContent = `${name}_before.pdf`;
     els.nameBefore.classList.remove('empty');
     els.nameAfter.textContent = `${name}_after.pdf`;
@@ -154,7 +179,7 @@ async function loadSample(name) {
     showCompareBar();
     setStatus('サンプル読み込み完了。「比較を実行」を押してください。');
   } catch (e) {
-    alert(`サンプル読み込みに失敗しました: ${e.message}\nローカルサーバー (例: python3 -m http.server) で開いてください。`);
+    alert(`サンプル読み込みに失敗しました: ${e.message}`);
     setStatus('サンプル読み込み失敗');
   }
 }
@@ -219,6 +244,10 @@ async function runDiff() {
   }
   setStatus('差分を計算中…');
   els.empty.style.display = 'none';
+  document.body.classList.add('has-pages');
+  document.body.classList.remove('show-controls');
+  const editBtn = document.getElementById('btnEditMode');
+  if (editBtn) editBtn.textContent = '✎ 編集';
   state.diffsByPage = [];
   const _diffStart = performance.now();
   _loader.show('Scanning…', `準備中 — 全 ${bLen} ページ`);
@@ -793,13 +822,29 @@ function focusDiff(pageIdx, regionId) {
     }
   }
   if (target) {
-    const r = target.getBoundingClientRect();
-    if (r.width > 0 && r.height > 0) {
-      const sr = els.stage.getBoundingClientRect();
-      const cx = r.left - sr.left + r.width / 2;
-      const cy = r.top  - sr.top  + r.height / 2;
-      view.x += sr.width / 2 - cx;
-      view.y += sr.height / 2 - cy;
+    const frame = target.closest('.canvasFrame');
+    const wrap  = document.querySelector('#stage .pageWrap');
+    if (frame && wrap) {
+      // canvas-px(rectの属性)→ pageWrap内のCSSピクセル座標で中心を求める
+      // (getBoundingClientRectは親のCSS transformと相互作用するブラウザ差があるため使わない)
+      const rx = parseFloat(target.getAttribute('x')) || 0;
+      const ry = parseFloat(target.getAttribute('y')) || 0;
+      const rw = parseFloat(target.getAttribute('width'))  || 0;
+      const rh = parseFloat(target.getAttribute('height')) || 0;
+      const nativeW = parseFloat(frame.dataset.nativeW) || frame.clientWidth || 1;
+      const nativeH = parseFloat(frame.dataset.nativeH) || frame.clientHeight || 1;
+      const fcw = frame.clientWidth  || frame.offsetWidth;
+      const fch = frame.clientHeight || frame.offsetHeight;
+      const sx = fcw / nativeW;
+      const sy = fch / nativeH;
+      // フレームのpageWrap内オフセット + rect中心 (CSSピクセル, transform前)
+      const cxContent = frame.offsetLeft + (rx + rw / 2) * sx;
+      const cyContent = frame.offsetTop  + (ry + rh / 2) * sy;
+      // ステージ中心に rect 中心を持ってくる
+      const sw = els.stage.clientWidth;
+      const sh = els.stage.clientHeight;
+      view.x = sw / 2 - cxContent * view.scale;
+      view.y = sh / 2 - cyContent * view.scale;
       applyView();
     }
   }
@@ -959,6 +1004,92 @@ els.stage.addEventListener('wheel', (e) => {
   const factor = e.deltaY < 0 ? 1.15 : 1 / 1.15;
   zoomAt(factor, p.x, p.y);
 }, { passive: false });
+
+// ---- タッチ対応 (パン + ピンチズーム + ダブルタップ) ----
+(function () {
+  const stage = els.stage;
+  const touchState = {
+    mode: null,             // 'pan' | 'pinch'
+    startX: 0, startY: 0,
+    originX: 0, originY: 0,
+    pinchDist: 0,
+    pinchCenter: { x: 0, y: 0 },
+    lastTap: 0,
+  };
+
+  const stageXY = (clientX, clientY) => {
+    const r = stage.getBoundingClientRect();
+    return { x: clientX - r.left, y: clientY - r.top };
+  };
+  const dist = (a, b) => {
+    const dx = a.clientX - b.clientX, dy = a.clientY - b.clientY;
+    return Math.hypot(dx, dy);
+  };
+  const center = (a, b) => stageXY((a.clientX + b.clientX) / 2, (a.clientY + b.clientY) / 2);
+
+  stage.addEventListener('touchstart', (e) => {
+    if (!document.querySelector('#stage .pageWrap')) return;
+    if (e.touches.length === 1) {
+      const t = e.touches[0];
+      const p = stageXY(t.clientX, t.clientY);
+      touchState.mode = 'pan';
+      touchState.startX = p.x; touchState.startY = p.y;
+      touchState.originX = view.x; touchState.originY = view.y;
+      // ダブルタップ判定
+      const now = Date.now();
+      if (now - touchState.lastTap < 300) {
+        fitFrames();
+        touchState.mode = null;
+        touchState.lastTap = 0;
+      } else {
+        touchState.lastTap = now;
+      }
+    } else if (e.touches.length === 2) {
+      const [a, b] = e.touches;
+      touchState.mode = 'pinch';
+      touchState.pinchDist = dist(a, b);
+      touchState.pinchCenter = center(a, b);
+    }
+  }, { passive: true });
+
+  stage.addEventListener('touchmove', (e) => {
+    if (!touchState.mode) return;
+    if (touchState.mode === 'pan' && e.touches.length === 1) {
+      const t = e.touches[0];
+      const p = stageXY(t.clientX, t.clientY);
+      view.x = touchState.originX + (p.x - touchState.startX);
+      view.y = touchState.originY + (p.y - touchState.startY);
+      applyView();
+      e.preventDefault();
+    } else if (touchState.mode === 'pinch' && e.touches.length === 2) {
+      const [a, b] = e.touches;
+      const newDist = dist(a, b);
+      if (touchState.pinchDist > 0) {
+        const factor = newDist / touchState.pinchDist;
+        const c = center(a, b);
+        zoomAt(factor, c.x, c.y);
+        touchState.pinchDist = newDist;
+        touchState.pinchCenter = c;
+      }
+      e.preventDefault();
+    }
+  }, { passive: false });
+
+  const endTouch = (e) => {
+    if (e.touches && e.touches.length === 0) {
+      touchState.mode = null;
+    } else if (e.touches && e.touches.length === 1 && touchState.mode === 'pinch') {
+      // ピンチから片手パンへの移行
+      const t = e.touches[0];
+      const p = stageXY(t.clientX, t.clientY);
+      touchState.mode = 'pan';
+      touchState.startX = p.x; touchState.startY = p.y;
+      touchState.originX = view.x; touchState.originY = view.y;
+    }
+  };
+  stage.addEventListener('touchend', endTouch);
+  stage.addEventListener('touchcancel', endTouch);
+}());
 
 let _resizeTimer = null;
 window.addEventListener('resize', () => {
@@ -1162,4 +1293,78 @@ window.addEventListener('DOMContentLoaded', () => {
   btnClose.addEventListener('click', close);
   modal.addEventListener('click', (e) => { if (e.target === modal) close(); });
   document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !modal.hidden) close(); });
+}());
+
+// ---- 編集モード切替 (モバイル比較後にファイル選択・範囲バーを呼び戻す) ----
+(function () {
+  const btn = document.getElementById('btnEditMode');
+  if (!btn) return;
+  btn.addEventListener('click', () => {
+    const showing = document.body.classList.toggle('show-controls');
+    btn.textContent = showing ? '✕ 閉じる' : '✎ 編集';
+  });
+}());
+
+// ---- モバイル: サイドバー(差分一覧)のドロワー ----
+(function () {
+  const sidebar  = document.getElementById('sidebar');
+  const toggle   = document.getElementById('sidebarToggle');
+  const backdrop = document.getElementById('sidebarBackdrop');
+  const badge    = document.getElementById('sidebarBadge');
+  if (!sidebar || !toggle || !backdrop) return;
+
+  const isMobile = () => window.matchMedia('(max-width: 820px)').matches;
+
+  const open = () => {
+    sidebar.classList.add('open');
+    backdrop.classList.add('open');
+    toggle.setAttribute('aria-expanded', 'true');
+  };
+  const close = () => {
+    sidebar.classList.remove('open');
+    backdrop.classList.remove('open');
+    toggle.setAttribute('aria-expanded', 'false');
+  };
+
+  toggle.addEventListener('click', () => {
+    if (sidebar.classList.contains('open')) close();
+    else open();
+  });
+  backdrop.addEventListener('click', close);
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && sidebar.classList.contains('open')) close();
+  });
+
+  // 差分項目クリック時、モバイルなら自動で閉じる
+  sidebar.addEventListener('click', (e) => {
+    if (!isMobile()) return;
+    const item = e.target.closest('.diff-item');
+    if (!item) return;
+    // チェックボックス操作では閉じない
+    if (e.target.closest('.diff-check') || e.target.closest('.page-check-actions')) return;
+    close();
+  });
+
+  // ビューポートが大きく戻ったら状態をリセット
+  window.addEventListener('resize', () => {
+    if (!isMobile()) close();
+  });
+
+  // 件数バッジを差分統計から拾って同期
+  const sync = () => {
+    const m = (document.getElementById('diffStats')?.textContent || '').match(/(\d+)\s*ITEMS/i);
+    const n = m ? parseInt(m[1], 10) : 0;
+    if (n > 0) {
+      badge.textContent = n;
+      badge.hidden = false;
+    } else {
+      badge.hidden = true;
+    }
+  };
+  const stats = document.getElementById('diffStats');
+  if (stats) {
+    const mo = new MutationObserver(sync);
+    mo.observe(stats, { childList: true, characterData: true, subtree: true });
+  }
+  sync();
 }());
