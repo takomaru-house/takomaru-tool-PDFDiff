@@ -6,7 +6,18 @@
 pdfjsLib.GlobalWorkerOptions.workerSrc =
   'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 
-const RENDER_SCALE = 2.0;
+// iPhone/Android Safari は WebContent プロセスの上限が厳しく、
+// scale=2.0 で複数ページの PDF を読むとタブごと kill → 再読込される
+// (画面が一瞬白くなり、ファイル選択欄が初期状態に戻る現象)。
+// モバイルでは解像度を控えめにしてピーク使用量を抑える。
+const _IS_TOUCH_MOBILE =
+  (typeof window !== 'undefined') &&
+  (window.matchMedia && window.matchMedia('(max-width: 820px)').matches) &&
+  (('ontouchstart' in window) || (navigator.maxTouchPoints || 0) > 0);
+const RENDER_SCALE = _IS_TOUCH_MOBILE ? 1.25 : 2.0;
+// iOS Safari の Canvas 上限 (おおむね 16M pixel) を超えるとレンダリングが
+// 失敗したり、白いキャンバスになったりするので個別ページごとにも頭打ちする。
+const MAX_CANVAS_AREA = _IS_TOUCH_MOBILE ? 8 * 1024 * 1024 : 16 * 1024 * 1024;
 const PIXEL_THRESHOLD = 32;
 const MIN_REGION_PX = 24;
 const PADDING = 4;
@@ -109,7 +120,14 @@ async function loadPdf(buf) {
   const pages = [];
   for (let i = 1; i <= doc.numPages; i++) {
     const page = await doc.getPage(i);
-    const viewport = page.getViewport({ scale: RENDER_SCALE });
+    // 個別ページが MAX_CANVAS_AREA を超える場合は scale をさらに落とす
+    const base = page.getViewport({ scale: RENDER_SCALE });
+    let scale = RENDER_SCALE;
+    const area = base.width * base.height;
+    if (area > MAX_CANVAS_AREA) {
+      scale = RENDER_SCALE * Math.sqrt(MAX_CANVAS_AREA / area);
+    }
+    const viewport = (scale === RENDER_SCALE) ? base : page.getViewport({ scale });
     const canvas = document.createElement('canvas');
     canvas.width = Math.ceil(viewport.width);
     canvas.height = Math.ceil(viewport.height);
@@ -284,14 +302,15 @@ async function runDiff() {
       const cb = padCanvas(pb.canvas, w, h);
       const ia = ca.getContext('2d').getImageData(0, 0, w, h);
       const ib = cb.getContext('2d').getImageData(0, 0, w, h);
-      const { mask, regions, diffCanvas } = pixelDiff(ia, ib, w, h);
+      // mask は pixelDiff 内部でのみ使うので保持しない (モバイルのメモリ節約)
+      const { regions, diffCanvas } = pixelDiff(ia, ib, w, h);
       const textDiffs = textDiff(pa.texts, pb.texts, regions);
       textDiffs.forEach(d => { d.checked = false; });
       state.diffsByPage.push({
         pageIndex: i,
         beforePage: state.beforeRange.start + i,
         afterPage:  state.afterRange.start + i,
-        regions, textDiffs, diffCanvas, w, h, mask,
+        regions, textDiffs, diffCanvas, w, h,
       });
     }
     state.currentPage = 0;
