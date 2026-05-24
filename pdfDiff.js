@@ -14,6 +14,8 @@ const PADDING = 4;
 const state = {
   before: null,
   after: null,
+  beforeName: null,
+  afterName: null,
   diffsByPage: [],
   currentPage: 0,
   mode: 'sbs',
@@ -84,6 +86,10 @@ async function loadFile(file, side) {
   const nameEl = side === 'before' ? els.nameBefore : els.nameAfter;
   nameEl.textContent = file.name;
   nameEl.classList.remove('empty');
+
+  // レポート出力用にファイル名を保持
+  if (side === 'before') state.beforeName = file.name;
+  else                   state.afterName  = file.name;
 
   setStatus(`${side === 'before' ? 'Before' : 'After'} を解析中…`);
   const buf = await file.arrayBuffer();
@@ -172,9 +178,11 @@ async function loadSample(name) {
     const a = base64ToArrayBuffer(data[name].after);
     state.before = await loadPdf(b);
     state.after  = await loadPdf(a);
-    els.nameBefore.textContent = `${name}_before.pdf`;
+    state.beforeName = `${name}_before.pdf`;
+    state.afterName  = `${name}_after.pdf`;
+    els.nameBefore.textContent = state.beforeName;
     els.nameBefore.classList.remove('empty');
-    els.nameAfter.textContent = `${name}_after.pdf`;
+    els.nameAfter.textContent = state.afterName;
     els.nameAfter.classList.remove('empty');
     showCompareBar();
     setStatus('サンプル読み込み完了。「比較を実行」を押してください。');
@@ -243,7 +251,7 @@ async function runDiff() {
     return;
   }
   setStatus('差分を計算中…');
-  els.empty.style.display = 'none';
+  if (els.empty) els.empty.style.display = 'none';
   document.body.classList.add('has-pages');
   document.body.classList.remove('show-controls');
   const editBtn = document.getElementById('btnEditMode');
@@ -251,48 +259,65 @@ async function runDiff() {
   state.diffsByPage = [];
   const _diffStart = performance.now();
   _loader.show('Scanning…', `準備中 — 全 ${bLen} ページ`);
+  // モバイル Safari ではクラス変更によるレイアウト反映が click ハンドラ完了まで
+  // 遅延することがあるので、計算開始前に確実にリフローさせる
   await yieldToRender();
-  for (let i = 0; i < bLen; i++) {
-    _loader.update(`PAGE ${i + 1} / ${bLen} を解析中…`);
-    if (i > 0) await yieldToRender();
-    const pa = state.before.pages[state.beforeRange.start - 1 + i];
-    const pb = state.after.pages[state.afterRange.start  - 1 + i];
-    if (!pa || !pb) {
+  try {
+    for (let i = 0; i < bLen; i++) {
+      _loader.update(`PAGE ${i + 1} / ${bLen} を解析中…`);
+      if (i > 0) await yieldToRender();
+      const pa = state.before.pages[state.beforeRange.start - 1 + i];
+      const pb = state.after.pages[state.afterRange.start  - 1 + i];
+      if (!pa || !pb) {
+        state.diffsByPage.push({
+          pageIndex: i, regions: [], textDiffs: [],
+          diffCanvas: null, w: 0, h: 0, missing: pa ? 'after' : 'before',
+          missingChecked: false,
+          beforePage: state.beforeRange.start + i,
+          afterPage:  state.afterRange.start + i,
+        });
+        continue;
+      }
+      const w = Math.max(pa.canvas.width, pb.canvas.width);
+      const h = Math.max(pa.canvas.height, pb.canvas.height);
+      const ca = padCanvas(pa.canvas, w, h);
+      const cb = padCanvas(pb.canvas, w, h);
+      const ia = ca.getContext('2d').getImageData(0, 0, w, h);
+      const ib = cb.getContext('2d').getImageData(0, 0, w, h);
+      const { mask, regions, diffCanvas } = pixelDiff(ia, ib, w, h);
+      const textDiffs = textDiff(pa.texts, pb.texts, regions);
+      textDiffs.forEach(d => { d.checked = false; });
       state.diffsByPage.push({
-        pageIndex: i, regions: [], textDiffs: [],
-        diffCanvas: null, w: 0, h: 0, missing: pa ? 'after' : 'before',
-        missingChecked: false,
+        pageIndex: i,
         beforePage: state.beforeRange.start + i,
         afterPage:  state.afterRange.start + i,
+        regions, textDiffs, diffCanvas, w, h, mask,
       });
-      continue;
     }
-    const w = Math.max(pa.canvas.width, pb.canvas.width);
-    const h = Math.max(pa.canvas.height, pb.canvas.height);
-    const ca = padCanvas(pa.canvas, w, h);
-    const cb = padCanvas(pb.canvas, w, h);
-    const ia = ca.getContext('2d').getImageData(0, 0, w, h);
-    const ib = cb.getContext('2d').getImageData(0, 0, w, h);
-    const { mask, regions, diffCanvas } = pixelDiff(ia, ib, w, h);
-    const textDiffs = textDiff(pa.texts, pb.texts, regions);
-    textDiffs.forEach(d => { d.checked = false; });
-    state.diffsByPage.push({
-      pageIndex: i,
-      beforePage: state.beforeRange.start + i,
-      afterPage:  state.afterRange.start + i,
-      regions, textDiffs, diffCanvas, w, h, mask,
+    state.currentPage = 0;
+    renderDiffList();
+    renderStage();
+    const MIN_LOADER_MS = 700;
+    const elapsed = performance.now() - _diffStart;
+    if (elapsed < MIN_LOADER_MS) {
+      await new Promise(r => setTimeout(r, MIN_LOADER_MS - elapsed));
+    }
+    setStatus(`完了 — ${bLen} ページ比較`);
+  } catch (err) {
+    console.error('runDiff failed:', err);
+    setStatus('差分計算に失敗しました');
+    alert('差分計算中にエラーが発生しました。\n' + (err && err.message ? err.message : err));
+  } finally {
+    // どんな経路でも必ずローダーを閉じる (モバイルでローダーが残り続けないように)
+    _loader.hide();
+    // iOS Safari ではレイアウト反映タイミングが遅れることがあるため、
+    // 比較完了後に複数回再フィットして確実に表示する
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => fitFrames());
     });
+    // アドレスバーの表示/非表示などで dvh が変わる場合にも追随
+    setTimeout(() => fitFrames(), 250);
   }
-  state.currentPage = 0;
-  renderDiffList();
-  renderStage();
-  const MIN_LOADER_MS = 700;
-  const elapsed = performance.now() - _diffStart;
-  if (elapsed < MIN_LOADER_MS) {
-    await new Promise(r => setTimeout(r, MIN_LOADER_MS - elapsed));
-  }
-  _loader.hide();
-  setStatus(`完了 — ${bLen} ページ比較`);
 }
 
 function padCanvas(src, w, h) {
@@ -708,6 +733,11 @@ function renderStage() {
   els.pageLabel.textContent = `p. ${String(idx + 1).padStart(2,'0')} / ${String(state.diffsByPage.length).padStart(2,'0')} — BEFORE p${p.beforePage} ↔ AFTER p${p.afterPage}`;
   els.renderInfo.textContent = pa ? `RES · ${pa.canvas.width} × ${pa.canvas.height} PX` : '';
   fitFrames();
+  // iOS Safari ではクラス変更後すぐは stage の寸法が確定していないことがある。
+  // 次フレームでもう一度フィットさせて、初回比較直後の「真っ白」状態を防ぐ。
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => fitFrames());
+  });
   if (state.selected) highlightRegion(state.selected.regionId);
 }
 
@@ -783,8 +813,13 @@ function fitFrames() {
   const sh = stageEl.clientHeight;
   const { w, h } = getPageWrapNativeSize();
   if (!w || !h) return;
+  // ステージ寸法が確定していない (リフロー前) のときは適用しない。
+  // 負スケールが入ると wrap が反転して見えなくなる。
+  if (sw < 40 || sh < 40) return;
   const PAD = 36;
-  const fit = Math.min((sw - PAD * 2) / w, (sh - PAD * 2) / h, 1.0);
+  const availW = Math.max(40, sw - PAD * 2);
+  const availH = Math.max(40, sh - PAD * 2);
+  const fit = Math.min(availW / w, availH / h, 1.0);
   view.baseScale = fit;
   view.scale = fit;
   view.x = (sw - w * fit) / 2;
@@ -1213,10 +1248,19 @@ function exportHtmlReport(mode) {
   const html = '<!doctype html><html lang="ja"><head><meta charset="utf-8"><title>' + escapeHtml(titleEn) + '</title>' +
     '<style>' + css + '</style>' +
     '</head><body>' + body + '</body></html>';
-  const filename = reportMode === 'unresolved'
-    ? 'pdf-diff-report-unresolved.html'
-    : 'pdf-diff-report.html';
+  const filename = buildReportFilename(reportMode);
   download(filename, html, 'text/html');
+}
+
+// レポートのファイル名を BEFORE/AFTER のPDF名から組み立てる
+// 例: A.pdf と B.pdf → "AとBの仕様比較.html"
+function buildReportFilename(reportMode) {
+  const stripExt = (n) => (n || '').replace(/\.[^.\/\\]+$/, '');
+  const sanitize = (n) => (n || '').replace(/[\\\/:*?"<>|\r\n\t]/g, '_').trim();
+  const a = sanitize(stripExt(state.beforeName)) || 'BEFORE';
+  const b = sanitize(stripExt(state.afterName))  || 'AFTER';
+  const suffix = reportMode === 'unresolved' ? '_未チェックのみ' : '';
+  return `${a}と${b}の仕様比較${suffix}.html`;
 }
 function download(name, content, mime) {
   const blob = new Blob([content], { type: mime });
