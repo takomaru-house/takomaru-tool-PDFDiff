@@ -1431,3 +1431,214 @@ window.addEventListener('DOMContentLoaded', () => {
   }
   sync();
 }());
+
+// ---- オンボーディング・ガイドツアー ----
+(function () {
+  const STORAGE_KEY = 'takomaru.pdfdiff.tourSeen.v1';
+
+  const steps = [
+    {
+      target: null,
+      eye: '§ WELCOME · ようこそ',
+      title: 'PDF Diff Checker へようこそ',
+      jp: '2つのPDF（旧版・新版）を見くらべて、変わった所を一覧表示する小さな道具です。基本の流れを少しだけご案内します。',
+    },
+    {
+      target: '.file-row',
+      eye: '§ 01 · SELECT FILES',
+      title: 'BEFORE と AFTER を選ぶ',
+      jp: 'ヘッダーの <b>BEFORE</b>（旧版）と <b>AFTER</b>（新版）に、見くらべたいPDFを1つずつ選んでください。',
+    },
+    {
+      target: '#empty .samples',
+      eye: '§ 02 · TRY SAMPLES',
+      title: '手ぶらで試せます',
+      jp: 'PDFが手元になくても、サンプル（表データ / 間取り図）から読み込めます。雰囲気を見るならここから。',
+    },
+    {
+      target: null,
+      eye: '§ 03 · RANGE & COMPARE',
+      title: '範囲を決めて、比較を実行',
+      jp: 'ファイルを読み込むと、ヘッダーの下に <b>比較範囲バー</b> が現れます。BEFORE・AFTERそれぞれのページ範囲を入れて、右端の <b>比較を実行 — COMPARE ▶</b> を押すと差分検出が始まります。',
+    },
+    {
+      target: '#toolbar .modes',
+      eye: '§ 04 · VIEW MODES',
+      title: '3つの見せ方',
+      jp: '結果は <b>並列・重ね・差分</b> の3モードで切り替えできます。重ねモードでは AFTER の透過率も調整できます。',
+    },
+    {
+      target: '#btnInfo',
+      eye: '§ 05 · REPLAY',
+      title: 'もう一度見たくなったら',
+      jp: 'この案内は <b>§ INFO</b> ボタンから「ガイドツアーを再生」で何度でも開けます。注意事項とクレジットも同じ場所です。',
+    },
+  ];
+
+  let idx = 0;
+  let active = false;
+  let overlay = null;
+  let ring = null;
+  let popover = null;
+
+  function build() {
+    overlay = document.createElement('div');
+    overlay.className = 'tour-overlay';
+    overlay.innerHTML =
+      '<div class="tour-ring" aria-hidden="true"></div>' +
+      '<div class="tour-popover" role="dialog" aria-modal="true" aria-label="使い方ガイド">' +
+        '<div class="tour-pop-head">' +
+          '<span class="tour-eye"></span>' +
+          '<button type="button" class="tour-skip" aria-label="ツアーを閉じる">✕ SKIP</button>' +
+        '</div>' +
+        '<div class="tour-pop-body">' +
+          '<span class="tour-step-num"></span>' +
+          '<h3 class="tour-title"></h3>' +
+          '<p class="tour-jp"></p>' +
+        '</div>' +
+        '<div class="tour-pop-foot">' +
+          '<span class="tour-progress"></span>' +
+          '<span class="tour-actions">' +
+            '<button type="button" class="tour-prev btn outline">◀ 戻る</button>' +
+            '<button type="button" class="tour-next btn fill">次へ ▶</button>' +
+          '</span>' +
+        '</div>' +
+      '</div>';
+    document.body.appendChild(overlay);
+    ring    = overlay.querySelector('.tour-ring');
+    popover = overlay.querySelector('.tour-popover');
+
+    overlay.querySelector('.tour-skip').addEventListener('click', end);
+    overlay.querySelector('.tour-prev').addEventListener('click', prev);
+    overlay.querySelector('.tour-next').addEventListener('click', next);
+
+    window.addEventListener('resize', render);
+    window.addEventListener('scroll', render, true);
+    document.addEventListener('keydown', onKey);
+  }
+
+  function onKey(e) {
+    if (!active) return;
+    if (e.key === 'Escape')      end();
+    else if (e.key === 'ArrowRight' || e.key === 'Enter') next();
+    else if (e.key === 'ArrowLeft')  prev();
+  }
+
+  function start() {
+    if (!overlay) build();
+    idx = 0;
+    active = true;
+    overlay.classList.add('open');
+    render();
+  }
+
+  function end() {
+    if (!active) return;
+    active = false;
+    overlay.classList.remove('open');
+    try { localStorage.setItem(STORAGE_KEY, '1'); } catch (e) { /* private mode */ }
+  }
+
+  function next() {
+    if (idx >= steps.length - 1) { end(); return; }
+    idx++; render();
+  }
+  function prev() {
+    if (idx <= 0) return;
+    idx--; render();
+  }
+
+  function isVisible(el) {
+    if (!el) return false;
+    const r = el.getBoundingClientRect();
+    if (r.width < 2 || r.height < 2) return false;
+    const cs = window.getComputedStyle(el);
+    if (cs.display === 'none' || cs.visibility === 'hidden') return false;
+    return true;
+  }
+
+  function placePopoverCenter() {
+    popover.classList.add('tour-center');
+    popover.classList.remove('tour-below', 'tour-above');
+  }
+
+  function placePopoverAround(r) {
+    popover.classList.remove('tour-center');
+    const vw  = window.innerWidth;
+    const vh  = window.innerHeight;
+    const pw  = popover.offsetWidth  || 360;
+    const ph  = popover.offsetHeight || 200;
+    const gap = 14;
+
+    const spaceBelow = vh - r.bottom;
+    const spaceAbove = r.top;
+    let top, pos;
+    if (spaceBelow >= ph + gap + 12 || spaceBelow >= spaceAbove) {
+      top = r.bottom + gap;
+      pos = 'tour-below';
+    } else {
+      top = r.top - ph - gap;
+      pos = 'tour-above';
+    }
+    let left = r.left + (r.width / 2) - (pw / 2);
+    left = Math.max(12, Math.min(left, vw - pw - 12));
+    top  = Math.max(12, Math.min(top,  vh - ph - 12));
+
+    popover.style.left = left + 'px';
+    popover.style.top  = top  + 'px';
+    popover.classList.remove('tour-below', 'tour-above');
+    popover.classList.add(pos);
+  }
+
+  function render() {
+    if (!active) return;
+    const step = steps[idx];
+
+    overlay.querySelector('.tour-eye').textContent      = step.eye;
+    overlay.querySelector('.tour-step-num').textContent = String(idx + 1).padStart(2, '0');
+    overlay.querySelector('.tour-title').textContent    = step.title;
+    overlay.querySelector('.tour-jp').innerHTML         = step.jp;
+    overlay.querySelector('.tour-progress').textContent = (idx + 1) + ' / ' + steps.length;
+    overlay.querySelector('.tour-prev').disabled        = (idx === 0);
+    overlay.querySelector('.tour-next').textContent     = (idx === steps.length - 1) ? '閉じる ✓' : '次へ ▶';
+
+    const target = step.target ? document.querySelector(step.target) : null;
+    if (target && isVisible(target)) {
+      const r = target.getBoundingClientRect();
+      const pad = 8;
+      ring.style.display = 'block';
+      ring.style.left    = (r.left - pad) + 'px';
+      ring.style.top     = (r.top  - pad) + 'px';
+      ring.style.width   = (r.width  + pad * 2) + 'px';
+      ring.style.height  = (r.height + pad * 2) + 'px';
+      overlay.classList.remove('no-target');
+      placePopoverAround(r);
+    } else {
+      ring.style.display = 'none';
+      overlay.classList.add('no-target');
+      placePopoverCenter();
+    }
+  }
+
+  // INFO モーダル内の「ガイドツアーを再生」ボタン
+  const replayBtn = document.getElementById('btnReplayTour');
+  if (replayBtn) {
+    replayBtn.addEventListener('click', () => {
+      const modal = document.getElementById('infoModal');
+      if (modal) modal.setAttribute('hidden', '');
+      start();
+    });
+  }
+
+  // 初回訪問の自動起動（既読は localStorage で抑制）
+  let seen = false;
+  try { seen = !!localStorage.getItem(STORAGE_KEY); } catch (e) { /* private mode */ }
+  if (!seen) {
+    const launch = () => setTimeout(start, 450);
+    if (document.readyState === 'complete') launch();
+    else window.addEventListener('load', launch);
+  }
+
+  // 開発者用フック（コンソールから再生したい時に）
+  window.__pdfDiffTour = { start, end };
+}());

@@ -6,7 +6,7 @@
 <title>PDF Diff Checker — タコまる 道具</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <link rel="stylesheet" href="colors_and_type.css">
-<link rel="stylesheet" href="pdfDiff.css?v=20260524b">
+<link rel="stylesheet" href="pdfDiff.css?v=20260607a">
 </head>
 <body data-mode="sbs">
 
@@ -14,7 +14,7 @@
   <div class="masthead">
     <div class="mark" aria-hidden="true"></div>
     <h1>PDF Diff Checker<span class="jp">／ PDF 差分 チェッカー</span></h1>
-    <span class="eye">§ 01 · TOOL</span>
+    <span class="eye">§ 03 · TOOL</span>
   </div>
 
   <div class="file-row" aria-label="ファイル選択">
@@ -141,7 +141,7 @@
       <div id="empty">
         <div class="takomaru-mark" aria-hidden="true"></div>
         <div class="copy">
-          <span class="eye">§ 01 · TOOL · TAKOMARU ARCHIVE</span>
+          <span class="eye">§ 03 · TOOL · TAKOMARU ARCHIVE</span>
           <h2>PDF Diff Checker<span class="jp">家づくりの図面を見くらべる。</span></h2>
           <p>
             PDFを2つ  — 旧版と新版 — を読み込むと、タコまるが頁ごとに差分を拾い上げ、
@@ -207,6 +207,7 @@
 
       <section class="info-section">
         <h3 class="info-section-title">§ USAGE · 使い方</h3>
+        <button type="button" id="btnReplayTour" class="btn outline tour-replay">▶ ガイドツアーを再生</button>
         <ol class="info-steps">
           <li>
             <span class="info-step-num">01</span>
@@ -295,6 +296,6 @@
   <div class="loader-progress" id="loaderProgress">準備中</div>
 </div>
 
-<script src="pdfDiff.js?v=20260524b"></script>
+<script src="pdfDiff.js?v=20260607a"></script>
 </body>
 </html>
