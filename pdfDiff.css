@@ -1093,6 +1093,46 @@ body[data-mode="overlay"] #stage .pageWrap .frame-diff { display: none; }
   font-size: 10px;
 }
 
+#empty .ad-banner {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 6px;
+  padding-top: 18px;
+  border-top: var(--hairline-soft);
+}
+#empty .ad-banner-pr {
+  font-family: var(--mono);
+  font-size: 9px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+  width: 100%;
+}
+#empty .ad-banner-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 20px;
+}
+#empty .ad-banner-item {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 260px;
+  max-width: 100%;
+}
+#empty .ad-banner-item img[width="350"],
+#empty .ad-banner-item img[width="300"] {
+  max-width: 100%;
+  height: auto;
+}
+#empty .ad-banner-copy {
+  font-size: 11px;
+  color: var(--ink-soft);
+  line-height: 1.6;
+  margin: 0;
+}
+
 /* ====================================================================
  * INFO Modal
  * ==================================================================== */
