@@ -838,6 +838,12 @@ body[data-mode="overlay"] .opacity-control { display: inline-flex; }
   user-select: none;
   isolation: isolate;
 }
+/* 比較前(空状態)は縦に伸びうるカードなので、はみ出した分をスクロールできるようにする
+   (比較後のパン/ズーム操作は overflow: hidden のまま維持) */
+body:not(.has-pages) #stage {
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
 
 /* paper grid background on the stage */
 #stage::before {
@@ -969,11 +975,10 @@ body[data-mode="overlay"] #stage .pageWrap .frame-diff { display: none; }
  * ==================================================================== */
 
 #empty {
-  position: absolute;
-  top: 50%; left: 50%;
-  transform: translate(-50%, -50%);
+  position: relative;
   z-index: 3;
   width: min(640px, 80%);
+  margin: 48px auto;
   text-align: left;
   padding: 48px 56px;
   background: var(--bg);
